@@ -23,8 +23,8 @@ This sketch is the production firmware for the MCCI&reg; [Catena 4430 Animal Act
 <!-- TOC depthFrom:2 updateOnSave:true -->
 
 - [Introduction](#introduction)
-- [Installing and Building](#installing-and-building)
 - [Integration with Catena 4610](#integration-with-catena-4610)
+- [Installing and Building](#installing-and-building)
 - [Overview](#overview)
 - [Activities](#activities)
 - [Primary Data Acquisition](#primary-data-acquisition)
@@ -71,6 +71,16 @@ The Catena 4430 adds the following functions to any compatible Feather-like boar
 - Three additional lights (red, green, and blue).
 
 - A JST XH-4 receptacle (in older units, a screw terminal) with four posts: two I/O signals, power, and ground. The power at the interconnect can be turned on and off under software control.
+
+## Integration with Catena 4610
+
+The Catena 4610 has the following features.
+
+- LoRaWAN-compatible radio and software
+
+- Bosch BME280 temperature/humidity/pressure sensor
+
+- Silicon Labs Si1133 ambient light sensor
 
 ## Installing and Building
 
