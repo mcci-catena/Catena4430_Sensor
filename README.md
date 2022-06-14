@@ -157,8 +157,8 @@ Activity  |   LED behavior
 
 **OperatingFlags**
 
-0x00000001 - At this case, LEDs are utilized as mentioned in above three cases
-0x40000001 - At this case, all LEDs including LED on Catena 4610 will stay in OFF state.
+1. 0x00000001 - At this case, LEDs are utilized as mentioned in above three cases
+2. 0x40000001 - At this case, all LEDs including LED on Catena 4610 will stay in OFF state.
 
 ## Commands
 
