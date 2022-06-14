@@ -40,8 +40,8 @@ static_assert(
     "This sketch requires Catena-Arduino-Platform v0.21.0-5 or later"
     );
 
-constexpr std::uint32_t kAppVersion = makeVersion(0,5,3,3);
-constexpr std::uint32_t kDoubleResetWaitMs = 500;
+constexpr std::uint32_t kAppVersion = makeVersion(1,0,0,1);
+constexpr std::uint32_t kDoubleResetWaitMs = 3000;
 constexpr std::uint32_t kSetDoubleResetMagic = 0xCA44301;
 constexpr std::uint32_t kClearDoubleResetMagic = 0xCA44300;
 
@@ -151,7 +151,10 @@ void setup_double_reset()
         else
             {
             RTC->BKP0R = kSetDoubleResetMagic;
+            pinMode(D13, OUTPUT);
+            digitalWrite(D13, HIGH);
             delay(kDoubleResetWaitMs);
+            digitalWrite(D13, LOW);
             RTC->BKP0R = kClearDoubleResetMagic;
             }
         }
@@ -273,7 +276,25 @@ void setup_rtc()
 
     cDate d;
     if (! gClock.get(d))
+        {
+        if (!gMeasurementLoop.fDisableLED)
+            {
+            uint8_t nBlink = 0;
+            while (nBlink < 5)
+                {
+                gpio.setRed(true);
+                delay(100);
+                gpio.setRed(false);
+                delay(100);
+                gpio.setRed(true);
+                delay(100);
+                gpio.setRed(false);
+                delay(500);
+                nBlink += 1;
+                }
+            }
         gCatena.SafePrintf("RTC is not running\n");
+        }
     else
         {
         gCatena.SafePrintf("RTC is running. Date: %d-%02d-%02d %02d:%02d:%02dZ\n",
@@ -350,7 +371,7 @@ void loop()
     if (gMeasurementLoop.fDisableLED)
         {
         gpio.setGreen(false);
-        gpio.setRed(false);
+        gpio.setBlue(false);
 
         // set flags of Pin A1 and A2 to false.
         // this used to check A1/A2 when disabling the flag fDisableLed
@@ -362,7 +383,7 @@ void loop()
     else
         {
         // copy current PIR state to the blue LED.
-        gpio.setBlue(digitalRead(A0));
+        gpio.setRed(digitalRead(A0));
 
         if (!fCheckPinA1)
             {
@@ -395,9 +416,9 @@ void loop()
         if (fAnalogPin2)
             {
             // copy current state of Pin A2 to the Green LED.
-            gpio.setRed(digitalRead(A2));
+            gpio.setBlue(digitalRead(A2));
             }
         else
-            gpio.setRed(false);
+            gpio.setBlue(false);
         }
     }

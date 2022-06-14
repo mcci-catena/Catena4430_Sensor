@@ -28,7 +28,7 @@ This sketch is the production firmware for the MCCI&reg; [Catena 4430 Animal Act
 - [Overview](#overview)
 - [Activities](#activities)
 - [Primary Data Acquisition](#primary-data-acquisition)
-- [Uplink Data](#uplink-data)
+- [Indication with LED](#indication-with-led)
 - [Commands](#commands)
 	- [`date`](#date)
 	- [`dir`, `tree`](#directory)
@@ -122,6 +122,43 @@ This firmware has the following features.
 The primary loop wakes up based on elapsed time, makes a series of measurements, scales them, and transmits them.
 
 It senses temp sensor data, light sensor data, PIR sensor (activity) data, pellet feeder data, battery level, and boot count. By default, the cycle time is every six minutes, but this can be adjusted using the cycle-time downlink.
+
+## Indication with LED
+
+Catena 4610 board has an onboard (Red) LED and Catena 4430 has three LEDs (Red, Green and Blue). These LEDs are used for indication for different cases.
+- Device Error
+- Status indication
+- Mouse Activity
+
+**Device Error**
+
+Error  |   LED behavior
+:---:|:----------
+  RTC incative  | Double blink Red 5 times
+  SD card error  | Double blink Green 5 times
+  LoRa not provisioned  | Double blink Blue 5 times
+
+**User Indication**
+
+Activity  |   LED behavior
+:---:|:----------
+  Updating SD card with `.bin` file  | Red, Blue, Green solid ON for entire duration
+  Time window for Double RESET  | Catena 4610 onboard LED solid ON for 3 seconds
+
+`***NOTE: On double RESET, the OperatingFlags toggle between 0x00000001 and 0x40000001.`
+
+**Mouse Activity**
+
+Activity  |   LED behavior
+:---:|:----------
+  Activity detected on PIR sensor  | Red on activity detection
+  Rising edge detected on A1  | Green on for one cycle (200ms)
+  Rising edge detected on A2  | Blue on for one cycle (200ms)
+
+**OperatingFlags**
+
+0x00000001 - At this case, LEDs are utilized as mentioned in above three cases
+0x40000001 - At this case, all LEDs including LED on Catena 4610 will stay in OFF state.
 
 ## Commands
 
