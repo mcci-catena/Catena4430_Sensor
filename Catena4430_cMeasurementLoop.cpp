@@ -288,6 +288,9 @@ cMeasurementLoop::fsmDispatch(
         else
             newState = State::stTryToMigrate;
         this->m_fFwUpdate = false;
+        gpio.setRed(false);
+        gpio.setGreen(false);
+        gpio.setBlue(false);
         break;
 
     // try to migrate to TTN V3
@@ -303,6 +306,22 @@ cMeasurementLoop::fsmDispatch(
     case State::stAwaitCard:
         if (fEntry)
             {
+            if (! this->fDisableLED)
+                {
+                uint8_t nBlink = 0;
+                while (nBlink < 5)
+                    {
+                    gpio.setBlue(true);
+                    delay(100);
+                    gpio.setBlue(false);
+                    delay(100);
+                    gpio.setBlue(true);
+                    delay(100);
+                    gpio.setBlue(false);
+                    delay(500);
+                    nBlink += 1;
+                    }
+                }
             gCatena.SafePrintf("** lorawan not provisioned!\n");
             }
 

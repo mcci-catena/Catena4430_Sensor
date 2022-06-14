@@ -121,7 +121,28 @@ bool
 cMeasurementLoop::checkSdCard()
     {
     sdPrep();
-    return gSD.begin(gSPI2, SPI_HALF_SPEED, kSdCardCSpin);
+    if (! gSD.begin(gSPI2, SPI_HALF_SPEED, kSdCardCSpin))
+        {
+        if (! this->fDisableLED)
+            {
+            uint8_t nBlink = 0;
+            while (nBlink < 5)
+                {
+                gpio.setGreen(true);
+                delay(100);
+                gpio.setGreen(false);
+                delay(100);
+                gpio.setGreen(true);
+                delay(100);
+                gpio.setGreen(false);
+                delay(500);
+                nBlink += 1;
+                }
+            }
+        return false;
+        }
+    else
+        return true;
     }
 
 static const char kHeader[] =
@@ -142,6 +163,22 @@ cMeasurementLoop::writeSdCard(
 
     if (! mData.DateTime.isValid())
         {
+        if (! this->fDisableLED)
+            {
+            uint8_t nBlink = 0;
+            while (nBlink < 5)
+                {
+                gpio.setRed(true);
+                delay(100);
+                gpio.setRed(false);
+                delay(100);
+                gpio.setRed(true);
+                delay(100);
+                gpio.setRed(false);
+                delay(500);
+                nBlink += 1;
+                }
+            }
         gCatena.SafePrintf("RTC not set, not storing data!\n");
         return false;
         }
@@ -392,6 +429,12 @@ cMeasurementLoop::handleSdFirmwareUpdateCardUp(
             if (gLog.isEnabled(gLog.kTrace))
                 gLog.printf(gLog.kAlways, "%s: not found: %s\n", FUNCTION, s);
             continue;
+            }
+        if (! this->fDisableLED)
+            {
+            gpio.setRed(true);
+            gpio.setGreen(true);
+            gpio.setBlue(true);
             }
 
         auto result = this->updateFromSd(
