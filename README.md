@@ -28,6 +28,7 @@ This sketch is the production firmware for the MCCI&reg; [Catena 4430 Animal Act
 - [Overview](#overview)
 - [Activities](#activities)
 - [Primary Data Acquisition](#primary-data-acquisition)
+- [Firmware update](#firmware-update)
 - [Indication with LED](#indication-with-led)
 - [Commands](#commands)
 	- [`date`](#date)
@@ -114,14 +115,19 @@ This firmware has the following features.
 2. [Primary Data Acquisition](#primary-data-acquisition): the activity that configures the PIR sensor, and then takes data. It wakes up periodically, poll registers, computes and send an uplink on LoRaWAN.
 3. [LoRaWAN control](#lorawan-control): this activity manages transmission and reception of data over LoRaWAN.
 4. [Local serial command processor](#commands)
-5. *[Future]* A firmware update activity
-6. *[Future]* An activity to handle copying firmware
+5. [Firmware update](#firmware-update): Firmware can be updated from SD card.
+6. [Indiation with LED](#indication-with-led): this helps to know the status of device activity/status.
+7. [Set RTC with network time](#set-rtc-nwtime): application grabs network time 8 hours once and configure RTC time on successful read.
 
 ## Primary Data Acquisition
 
 The primary loop wakes up based on elapsed time, makes a series of measurements, scales them, and transmits them.
 
 It senses temp sensor data, light sensor data, PIR sensor (activity) data, pellet feeder data, battery level, and boot count. By default, the cycle time is every six minutes, but this can be adjusted using the cycle-time downlink.
+
+## Firmware update
+
+Application can update the firmware on-field with help of SD card. Check for a suitable file (`update.bin`) on the SD card during each uplink cycle. If found, copy to flash. If successful, srename the update file so we won't consider it again.
 
 ## Indication with LED
 
@@ -142,7 +148,7 @@ Error  |   LED behavior
 
 Activity  |   LED behavior
 :---:|:----------
-  Updating SD card with `.bin` file  | Red, Blue, Green solid ON for entire duration
+  Updating Firmware from SD card with `.bin` file  | Red, Blue, Green solid ON for entire duration
   Time window for Double RESET  | Catena 4610 onboard LED solid ON for 3 seconds
 
 `***NOTE: On double RESET, the OperatingFlags toggle between 0x00000001 and 0x40000001.`
