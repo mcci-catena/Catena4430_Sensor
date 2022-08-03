@@ -20,6 +20,7 @@ Author:
 #include <arduino_lmic.h>
 #include <Catena_Timer.h>
 #include <Catena4430.h>
+#include <Catena_FlashParam.h>
 #include <Catena_Date.h>
 #include <Catena4430_cPCA9570.h>
 #include <Catena4430_c4430Gpios.h>
@@ -40,7 +41,7 @@ static_assert(
     "This sketch requires Catena-Arduino-Platform v0.21.0-5 or later"
     );
 
-constexpr std::uint32_t kAppVersion = makeVersion(1,0,0,0);
+constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(1,0,0,0);
 constexpr std::uint32_t kDoubleResetWaitMs = 3000;
 constexpr std::uint32_t kSetDoubleResetMagic = 0xCA44301;
 constexpr std::uint32_t kClearDoubleResetMagic = 0xCA44300;
@@ -64,7 +65,16 @@ cTimer ledTimer;
 Catena::LoRaWAN gLoRaWAN;
 StatusLed gLed (Catena::PIN_STATUS_LED);
 
-cMeasurementLoop gMeasurementLoop;
+FlashParamsStm32L0_t::ParamBoard_t gParam;
+
+// the Temperature/Humidity Sensor
+cSHT3x gSht { Wire };
+
+// the light Sensor
+Ltr_329als gLtr {Wire};
+
+// the measurement loop instance
+cMeasurementLoop gMeasurementLoop { gSht, gLtr };
 
 /* instantiate the bootloader API */
 cBootloaderApi gBootloaderApi;
@@ -228,7 +238,10 @@ void setup_printSignOn()
 
     gCatena.SafePrintf("This is %s v%d.%d.%d-%d.\n",
         filebasename(__FILE__),
-        getMajor(kAppVersion), getMinor(kAppVersion), getPatch(kAppVersion), getLocal(kAppVersion)
+        McciCatena4430::getMajor(kAppVersion),
+        McciCatena4430::getMinor(kAppVersion),
+        McciCatena4430::getPatch(kAppVersion),
+        McciCatena4430::getLocal(kAppVersion)
         );
 
     do

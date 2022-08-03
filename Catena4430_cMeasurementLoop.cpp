@@ -25,6 +25,7 @@ using namespace McciCatena;
 
 extern c4430Gpios gpio;
 extern cMeasurementLoop gMeasurementLoop;
+extern FlashParamsStm32L0_t::ParamBoard_t gParam;
 
 static constexpr uint8_t kVddPin = D11;
 
@@ -62,34 +63,71 @@ void cMeasurementLoop::begin()
     this->m_PelletFeeder.begin(gCatena);
 
     Wire.begin();
-    if (this->m_BME280.begin(BME280_ADDRESS, Adafruit_BME280::OPERATING_MODE::Sleep))
+
+    if (!this->flashParam())
         {
-        this->m_fBme280 = true;
+        gCatena.SafePrintf("**Unable to fetch Revision, default set as 'D'!\n");
+        this->boardRev = 3;
+        }
+
+    if (this->boardRev < 3)
+        {
+        kMessageFormat = MeasurementFormat::kMessageFormatV1;
+
+        if (this->m_BME280.begin(BME280_ADDRESS, Adafruit_BME280::OPERATING_MODE::Sleep))
+            {
+            this->m_fBme280 = true;
+            }
+        else
+            {
+            this->m_fBme280 = false;
+            gCatena.SafePrintf("No BME280 found: check wiring\n");
+            }
+
+        if (this->m_si1133.begin())
+            {
+            this->m_fSi1133 = true;
+            this->m_fLowLight = true;
+
+            auto const measConfig =	Catena_Si1133::ChannelConfiguration_t()
+                .setAdcMux(Catena_Si1133::InputLed_t::LargeWhite)
+                .setSwGainCode(7)
+                .setHwGainCode(4)
+                .setPostShift(1)
+                .set24bit(true);
+
+            this->m_si1133.configure(0, measConfig, 0);
+            }
+        else
+            {
+            this->m_fSi1133 = false;
+            gCatena.SafePrintf("No Si1133 found: check hardware\n");
+            }
         }
     else
         {
-        this->m_fBme280 = false;
-        gCatena.SafePrintf("No BME280 found: check wiring\n");
-        }
+        kMessageFormat = MeasurementFormat::kMessageFormatV2;
 
-    if (this->m_si1133.begin())
-        {
-        this->m_fSi1133 = true;
-        this->m_fLowLight = true;
+        if (this->m_Sht.begin())
+            {
+            this->m_fSht3x = true;
+            }
+        else
+            {
+            this->m_fSht3x = false;
+            gCatena.SafePrintf("No SHT3x found: check wiring\n");
+            }
 
-        auto const measConfig =	Catena_Si1133::ChannelConfiguration_t()
-            .setAdcMux(Catena_Si1133::InputLed_t::LargeWhite)
-            .setSwGainCode(7)
-            .setHwGainCode(4)
-            .setPostShift(1)
-            .set24bit(true);
-
-        this->m_si1133.configure(0, measConfig, 0);
-        }
-    else
-        {
-        this->m_fSi1133 = false;
-        gCatena.SafePrintf("No Si1133 found: check hardware\n");
+        if (this->m_Ltr.begin())
+            {
+            this->m_fHardError = false;
+            this->m_fLtr329 = true;
+            }
+        else
+            {
+            this->m_fLtr329 = false;
+            gCatena.SafePrintf("No LTR329 found: check hardware\n");
+            }
         }
 
     // read network time and set correct UTC time in RTC
@@ -116,6 +154,72 @@ void cMeasurementLoop::end()
         this->m_exit = true;
         this->m_fsm.eval();
         }
+    }
+
+bool cMeasurementLoop::flashParam()
+    {
+    // fetch the signature
+    const FlashParamsStm32L0_t::PageEndSignature1_t * const pRomSig = reinterpret_cast<const FlashParamsStm32L0_t::PageEndSignature1_t *>(FlashParamsStm32L0_t::kPageEndSignature1Address);
+    const auto guid { FlashParamsStm32L0_t::kPageEndSignature1_Guid };
+
+    if (std::memcmp((const void *) &pRomSig->Guid, (const void *) &guid, sizeof(pRomSig->Guid)) != 0)
+        {
+        gCatena.SafePrintf("Guid value wrong\n");
+        return false;
+        }
+
+    // get pointer to memory block */
+    uint32_t descAddr = pRomSig->getParamPointer();
+    if (! pRomSig->isValidParamPointer(descAddr))
+        {
+        gCatena.SafePrintf("invalid paramter pointer: %#08x\n", descAddr);
+        return false;
+        }
+
+    // find the serial number (must be first)
+    const FlashParamsStm32L0_t::ParamBoard_t * const pBoard =
+        reinterpret_cast<const FlashParamsStm32L0_t::ParamBoard_t *>(descAddr);
+
+    // check the ID and length
+    if (! (pBoard->uLen == sizeof(*pBoard) && pBoard->uType == unsigned(FlashParamsStm32L0_t::ParamDescId::Board)))
+        {
+        gCatena.SafePrintf("invalid board length=%02x or type=%02x\n", pBoard->uLen, pBoard->uType);
+        return false;
+        }
+
+    // at last: print the s/n, model, ECN
+    gCatena.SafePrintf("serial-number:");
+    uint8_t serial[pBoard->nSerial];
+    pBoard->getSerialNumber(serial);
+
+    for (unsigned i = 0; i < sizeof(serial); ++i)
+        gCatena.SafePrintf("%c%02x", i == 0 ? ' ' : '-', serial[i]);
+
+    gCatena.SafePrintf(
+        "\nAssembly-number: %u\nModel: %u\n",
+        pBoard->getAssembly(),
+        pBoard->getModel()
+        );
+    delay(1);
+    gCatena.SafePrintf(
+        "ModNumber: %u\n",
+        pBoard->getModNumber()
+        );
+    this->boardRev = pBoard->getRev();
+    gCatena.SafePrintf(
+        "RevNumber: %u\n",
+        this->boardRev
+        );
+    gCatena.SafePrintf(
+        "Rev: %c\n",
+        pBoard->getRevChar()
+        );
+    gCatena.SafePrintf(
+        "Dash: %u\n",
+        pBoard->getDash()
+        );
+
+    return true;
     }
 
 void cMeasurementLoop::requestActive(bool fEnable)
@@ -209,22 +313,41 @@ cMeasurementLoop::fsmDispatch(
         if (fEntry)
             {
             // start SI1133 measurement (one-time)
-            this->m_si1133.start(true);
+            if (this->m_fSi1133)
+                this->m_si1133.start(true);
             this->updateSynchronousMeasurements();
             this->setTimer(1000);
             }
 
-        if (this->m_si1133.isOneTimeReady())
+        if (this->m_fSi1133)
             {
-            this->updateLightMeasurements();
-            newState = State::stTransmit;
+            if (this->m_si1133.isOneTimeReady())
+                {
+                this->updateLightMeasurements();
+                newState = State::stTransmit;
+                }
+            else if (this->timedOut())
+                {
+                this->m_si1133.stop();
+                newState = State::stTransmit;
+                if (this->isTraceEnabled(this->DebugFlags::kError))
+                    gCatena.SafePrintf("S1133 timed out\n");
+                }
             }
-        else if (this->timedOut())
+        else if (this->m_fLtr329)
             {
-            this->m_si1133.stop();
-            newState = State::stTransmit;
-            if (this->isTraceEnabled(this->DebugFlags::kError))
-                gCatena.SafePrintf("S1133 timed out\n");
+            if (this->m_Ltr.startSingleMeasurement())
+                {
+                this->updateLightMeasurements();
+                newState = State::stTransmit;
+                }
+            else if (this->timedOut())
+                {
+                this->m_fHardError = true;
+                newState = State::stTransmit;
+                }
+            else
+                this->m_fHardError = true;
             }
         break;
 
@@ -382,7 +505,17 @@ void cMeasurementLoop::updateSynchronousMeasurements()
         this->m_data.env.Temperature = m.Temperature;
         this->m_data.env.Pressure = m.Pressure;
         this->m_data.env.Humidity = m.Humidity;
-        this->m_data.flags |= Flags::TPH;
+        this->m_data.flags |= Flags::Env;
+        }
+
+    if (this->m_fSht3x)
+        {
+        cSHT3x::Measurements m;
+        this->m_Sht.getTemperatureHumidity(m);
+        this->m_data.env.Temperature = m.Temperature;
+        this->m_data.env.Pressure = 0x0000;
+        this->m_data.env.Humidity = m.Humidity;
+        this->m_data.flags |= Flags::Env;
         }
 
     // SI1133 is handled separately
@@ -434,18 +567,57 @@ void cMeasurementLoop::measureActivity()
 
 void cMeasurementLoop::updateLightMeasurements()
     {
-    uint32_t data[1];
+    if (this->m_fSi1133)
+        {
+        uint32_t data[1];
 
-    this->m_si1133.readMultiChannelData(data, 1);
-    this->m_si1133.stop();
+        this->m_si1133.readMultiChannelData(data, 1);
+        this->m_si1133.stop();
 
-    this->m_data.flags |= Flags::Light;
-    this->m_data.light.White = (float) data[0];
+        this->m_data.flags |= Flags::Light;
+        this->m_data.light.White = (float) data[0];
 
-    if (data[0] <= 500)
-        m_fLowLight = true;
-    else
-        m_fLowLight = false;
+        if (data[0] <= 500)
+            this->m_fLowLight = true;
+        else
+            this->m_fLowLight = false;
+        }
+
+    if (this->m_fLtr329)
+        {
+        float currentLux;
+        bool fHardError;
+
+        while (! this->m_Ltr.queryReady(fHardError))
+            {
+            if (fHardError)
+                break;
+            }
+
+        if (fHardError)
+            {
+            this->m_fHardError = true;
+            if (gLog.isEnabled(gLog.DebugFlags::kError))
+                gLog.printf(
+                    gLog.kAlways,
+                    "LTR329 queryReady failed: status %s(%u)\n",
+                    this->m_Ltr.getLastErrorName(),
+                    unsigned(this->m_Ltr.getLastError())
+                    );
+            }
+        else
+            {
+            currentLux = this->m_Ltr.getLux();
+
+            this->m_data.flags |= Flags::Light;
+            this->m_data.light.Lux = currentLux;
+
+            if (currentLux <= 100)
+                this->m_fLowLight = true;
+            else
+                this->m_fLowLight = false;
+            }
+        }
     }
 
 void cMeasurementLoop::resetPirAccumulation()

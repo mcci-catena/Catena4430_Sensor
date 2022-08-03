@@ -85,29 +85,55 @@ cMeasurementLoop::fillTxBuffer(
         b.putBootCountLsb(mData.BootCount);
         }
 
-    if ((mData.flags & Flags::TPH) != Flags(0))
+    if ((mData.flags & Flags::Env) != Flags(0))
         {
-        gCatena.SafePrintf(
-                "BME280:  T: %d P: %d RH: %d\n",
-                (int) mData.env.Temperature,
-                (int) mData.env.Pressure,
-                (int) mData.env.Humidity
-                );
-        b.putT(mData.env.Temperature);
-        b.putP(mData.env.Pressure);
-        // no method for 2-byte RH, directly encode it.
-        b.put2uf((mData.env.Humidity / 100.0f) * 65535.0f);
+        if (this->m_fBme280)
+            {
+            gCatena.SafePrintf(
+                    "BME280:  T: %d P: %d RH: %d\n",
+                    (int) mData.env.Temperature,
+                    (int) mData.env.Pressure,
+                    (int) mData.env.Humidity
+                    );
+            b.putT(mData.env.Temperature);
+            b.putP(mData.env.Pressure);
+            // no method for 2-byte RH, directly encode it.
+            b.put2uf((mData.env.Humidity / 100.0f) * 65535.0f);
+            }
+        else if (this->m_fSht3x)
+            {
+            gCatena.SafePrintf(
+                    "SHT3x:  T: %d RH: %d\n",
+                    (int) mData.env.Temperature,
+                    (int) mData.env.Humidity
+                    );
+            b.putT(mData.env.Temperature);
+            // no method for 2-byte RH, directly encode it.
+            b.put2uf((mData.env.Humidity / 100.0f) * 65535.0f);
+            }
         }
 
     // put light
     if ((mData.flags & Flags::Light) != Flags(0))
         {
-        gCatena.SafePrintf(
-                "Si1133:  %d White\n",
-                (int) mData.light.White
-                );
+        if (this->m_fSi1133)
+            {
+            gCatena.SafePrintf(
+                    "Si1133:  %d White\n",
+                    (int) mData.light.White
+                    );
 
-        b.putLux(LMIC_f2uflt16(mData.light.White / pow(2.0, 24)));
+            b.putLux(LMIC_f2uflt16(mData.light.White / pow(2.0, 24)));
+            }
+        else if (this->m_fLtr329)
+            {
+            gCatena.SafePrintf(
+                    "Ltr329:  %d Lux\n",
+                    (int) mData.light.Lux
+                    );
+
+            b.putLux(LMIC_f2uflt16(mData.light.Lux / pow(2.0, 24)));
+            }
         }
 
     // put pellets

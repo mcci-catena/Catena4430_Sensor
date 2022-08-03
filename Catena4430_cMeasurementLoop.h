@@ -22,6 +22,7 @@ Author:
 #include <Wire.h>
 #include <Adafruit_BME280.h>
 #include <Catena_Download.h>
+#include <Catena_FlashParam.h>
 #include <Catena_FSM.h>
 #include <Catena_Led.h>
 #include <Catena_Log.h>
@@ -37,6 +38,8 @@ Author:
 #include "Catena4430_cPelletFeeder.h"
 #include "Catena4430_cPIRdigital.h"
 #include <Catena_Date.h>
+#include <Catena-SHT3x.h>
+#include <mcci_ltr_329als.h>
 
 #include <cstdint>
 
@@ -45,6 +48,9 @@ extern McciCatena::cDate gDate;
 extern McciCatena::Catena::LoRaWAN gLoRaWAN;
 extern McciCatena::StatusLed gLed;
 extern McciCatena4430::cClockDriver_PCF8523 gClock;
+
+using namespace McciCatenaSht3x;
+using namespace Mcci_Ltr_329als;
 
 namespace McciCatena4430 {
 
@@ -109,10 +115,11 @@ public:
 
 
 template <unsigned a_kMaxActivityEntries>
-class cMeasurementFormat22 : public cMeasurementBase
+class cMeasurementFormat : public cMeasurementBase
     {
 public:
-    static constexpr uint8_t kMessageFormat = 0x22;
+    static constexpr uint8_t kMessageFormatV1 = 0x22;
+    static constexpr uint8_t kMessageFormatV2 = 0x32;
 
     enum class Flags : uint8_t
             {
@@ -120,8 +127,8 @@ public:
             Vcc = 1 << 1,       // system voltage
             Vbus = 1 << 2,      // Vbus input
             Boot = 1 << 3,      // boot count
-            TPH = 1 << 4,       // temperature, pressure, humidity
-            Light = 1 << 5,     // light (IR, white, UV)
+            Env = 1 << 4,       // temperature, pressure(if BME), humidity
+            Light = 1 << 5,     // light (if Si1133: IR, white, UV)
             Pellets = 1 << 6,   // Pellet count
             Activity = 1 << 7,  // Activity (min/max/avg)
             };
@@ -153,6 +160,8 @@ public:
             {
             // "white" light, in w/m^2
             float                   White;
+            // light intensity
+            float                   Lux;
             };
 
         // count of food pellets
@@ -209,11 +218,11 @@ public:
     static constexpr std::uint8_t kUplinkPortwithNwTime = 3;
     static constexpr bool kEnableDeepSleep = false;
     static constexpr unsigned kMaxActivityEntries = 8;
-    using MeasurementFormat = cMeasurementFormat22<kMaxActivityEntries>;
+    using MeasurementFormat = cMeasurementFormat<kMaxActivityEntries>;
     static constexpr unsigned kMaxPelletEntries = MeasurementFormat::kMaxPelletEntries;
     using Measurement = MeasurementFormat::Measurement;
     using Flags = MeasurementFormat::Flags;
-    static constexpr std::uint8_t kMessageFormat = MeasurementFormat::kMessageFormat;
+    std::uint8_t kMessageFormat;
     static constexpr std::uint8_t kSdCardCSpin = D5;
 
     void deepSleepPrepare();
@@ -240,8 +249,12 @@ public:
 
     // constructor
     cMeasurementLoop(
+            McciCatenaSht3x::cSHT3x& sht3x,
+            Mcci_Ltr_329als::Ltr_329als& ltr329
             )
-        : m_pirSampleSec(2)                 // PIR sample timer
+        : m_Sht(sht3x)
+        , m_Ltr(ltr329)
+        , m_pirSampleSec(2)                 // PIR sample timer
         , m_txCycleSec_Permanent(6 * 60)    // default uplink interval
         , m_txCycleSec(60)                  // initial uplink interval
         , m_txCycleCount(10)                // initial count of fast uplinks
@@ -307,9 +320,13 @@ public:
     // set start time when network time is being set
     std::uint32_t startTime;
 
+    // get Rev number
+    std::uint8_t boardRev;
+
     // initialize measurement FSM.
     void begin();
     void end();
+    bool flashParam();
     void setTxCycleTime(
         std::uint32_t txCycleSec,
         std::uint32_t txCycleCount
@@ -419,8 +436,13 @@ private:
     // evaluate the control FSM.
     State fsmDispatch(State currentState, bool fEntry);
 
+    // used in Catena4610 V1 boards
     Adafruit_BME280                 m_BME280;
     McciCatena::Catena_Si1133       m_si1133;
+
+    // used in Catena4610 V2 boards
+    McciCatenaSht3x::cSHT3x&        m_Sht;
+    Mcci_Ltr_329als::Ltr_329als&    m_Ltr;
 
     // second SPI class
     SPIClass                        *m_pSPI2;
@@ -452,8 +474,14 @@ private:
     bool                            m_fBme280 : 1;
     // set true if SI1133 is present
     bool                            m_fSi1133: 1;
-    // set true if SI1133 detects low light
+    // set true if SHT3x is present
+    bool                            m_fSht3x : 1;
+    // set true if LTR329 is present
+    bool                            m_fLtr329: 1;
+    // set true if SI1133/LTR329 detects low light
     bool                            m_fLowLight: 1;
+    // set true if hardware error in LTR329 is present
+    bool                            m_fHardError: 1;
 
     // set true while a transmit is pending.
     bool                            m_txpending : 1;

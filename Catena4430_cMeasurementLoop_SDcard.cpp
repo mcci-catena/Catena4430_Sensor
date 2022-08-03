@@ -305,7 +305,7 @@ cMeasurementLoop::writeSdCard(
 
             dataFile.print(',');
 
-            if ((mData.flags & Flags::TPH) != Flags(0))
+            if ((mData.flags & Flags::Env) != Flags(0))
                 {
                 dataFile.print(mData.env.Temperature);
                 dataFile.print(',');
@@ -322,7 +322,10 @@ cMeasurementLoop::writeSdCard(
 
             if ((mData.flags & Flags::Light) != Flags(0))
                 {
-                dataFile.print(mData.light.White);
+                if (this->m_fSi1133)
+                    dataFile.print(mData.light.White);
+                else if (this->m_fLtr329)
+                    dataFile.print(mData.light.Lux);
                 }
             dataFile.print(',');
 
