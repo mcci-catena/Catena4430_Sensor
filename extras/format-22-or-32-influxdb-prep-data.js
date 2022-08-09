@@ -1,6 +1,6 @@
 /*
 
-Name:   format-22-influxdb-prep-data.js
+Name:   format-22-or-32-influxdb-prep-data.js
 
 Function:
     Decode port 0x01 format 0x22 messages for Node-RED.
@@ -63,7 +63,7 @@ fields.message_raw = toHexBuffer(msg.payload_raw);
 
 // array of names of items in msg.payload, each match to be copied as a value.
 var field_keys = [
-    "counter", "Vbat", "Vbus", "Vsys", "boot", "tempC", "tDewC", "tHeatIndexC", "p", "p0", "rh", "irradiance", "pellets", "activity"
+    "counter", "Vbat", "Vbus", "Vsys", "boot", "tempC", "tDewC", "tHeatIndexC", "p", "p0", "rh", "irradiance", "lux", "pellets", "activity"
 ];
 
 // array of names of items in msg.payload, each match to be copied as a tag
