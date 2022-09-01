@@ -145,8 +145,14 @@ cMeasurementLoop::checkSdCard()
         return true;
     }
 
-static const char kHeader[] =
+static const char kHeaderVerOne[] =
     "Time,DevEUI,Raw,Vbat,Vsystem,Vbus,BootCount,T,RH,P,Light,"
+    "P[0].delta,P[0].total,P[1].delta,P[1].total,"
+    "Act[7],Act[6],Act[5],Act[4],Act[3],Act[2],Act[1],Act[0]"
+    "\n";
+
+static const char kHeaderVerTwo[] =
+    "Time,DevEUI,Raw,Vbat,Vsystem,Vbus,BootCount,T,RH,P,Lux,"
     "P[0].delta,P[0].total,P[1].delta,P[1].total,"
     "Act[7],Act[6],Act[5],Act[4],Act[3],Act[2],Act[1],Act[0]"
     "\n";
@@ -214,19 +220,42 @@ cMeasurementLoop::writeSdCard(
             if (fNew)
                 {
                 //gCatena.SafePrintf("write header\n");
-                for (auto i : kHeader)
+
+                if (this->m_fSi1133)
                     {
-                    if (i == '\n')
+                    for (auto i : kHeaderVerOne)
                         {
-                        dataFile.println();
+                        if (i == '\n')
+                            {
+                            dataFile.println();
+                            }
+                        else if (i == '\0')
+                            {
+                            break;
+                            }
+                        else
+                            {
+                            dataFile.print(i);
+                            }
                         }
-                    else if (i == '\0')
+                    }
+
+                else if (this->m_fLtr329)
+                    {
+                    for (auto i : kHeaderVerTwo)
                         {
-                        break;
-                        }
-                    else
-                        {
-                        dataFile.print(i);
+                        if (i == '\n')
+                            {
+                            dataFile.println();
+                            }
+                        else if (i == '\0')
+                            {
+                            break;
+                            }
+                        else
+                            {
+                            dataFile.print(i);
+                            }
                         }
                     }
                 }
@@ -312,7 +341,10 @@ cMeasurementLoop::writeSdCard(
 
                 dataFile.print(mData.env.Humidity);
                 dataFile.print(',');
-                dataFile.print(mData.env.Pressure);
+
+                if (this->m_fBme280)
+                    dataFile.print(mData.env.Pressure);
+
                 dataFile.print(',');
                 }
             else
