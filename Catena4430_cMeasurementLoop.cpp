@@ -67,7 +67,7 @@ void cMeasurementLoop::begin()
     if (!this->flashParam())
         {
         gCatena.SafePrintf("**Unable to fetch Revision, default set as 'D'!\n");
-        this->boardRev = 3;
+        this->boardRev = 1;
         }
 
     if (this->boardRev < 3)
