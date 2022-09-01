@@ -13,7 +13,7 @@
 	- [Bus Voltage (field 2)](#bus-voltage-field-2)
 	- [Boot counter (field 3)](#boot-counter-field-3)
 	- [Environmental Readings (field 4)](#environmental-readings-field-4)
-	- [Ambient Light (field 5)](#ambient-light-field-5)
+	- [Light Readings (field 5)](#light-readings-field-5)
 	- [Pellet consumption (field 6)](#pellet-consumption-field-6)
 	- [Activity Indication (field 7)](#activity-indication-field-7)
 - [Data Formats](#data-formats)
@@ -86,7 +86,7 @@ Bitmap bit | Length of corresponding field (bytes) | Data format |Description
 2 | 2 | [`int16`](#int16) | [Bus voltage](#bus-voltage-field-2)
 3 | 1 | [`uint8`](#uint8) | [Boot counter](#boot-counter-field-3)
 4 | 6 | [`int16`](#int16), [`uint16`](#uint16)(if 0x22 format), [`uint16`](#uint16) | [Temperature, Pressure(if 0x22 format), Humidity](#environmental-readings-field-4)
-5 | 2 | [`uflt16`](#uflt16) | [Ambient Light](#ambient-light-field-5)
+5 | 2 | [`uflt16`](#uflt16) | [Light / Lux](#light-readings-field-5)
 6 | 6 | ([`uint16`](#uint16), `uint8`)\[2] | [Pellet count](#pellet-count-field-6)
 7 | 2*n | [`sflt16`](#sflt16)\[n] | [Activity indication](#activity-indication-field-7)
 
@@ -118,7 +118,7 @@ Field 4, if present, has three environmental readings as four bytes of data.
 
 - The next two bytes are a [`uint16`](#uint16) representing the relative humidity (divide by 65535 to get percent). This field can represent humidity from 0% to 100%, in steps of roughly 0.001529%.
 
-### Ambient Light (field 5)
+### Light Readings (field 5)
 
 If 0x22 format, this field represents the ambient "white light" expressed as W/cm^2. If the field is zero, it will not be transmitted.
 
