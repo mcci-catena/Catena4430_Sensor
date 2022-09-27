@@ -32,6 +32,7 @@ Author:
 #include <Catena_Si1133.h>
 #include <Catena_Timer.h>
 #include <Catena_TxBuffer.h>
+#include <Catena_FlashParam.h>
 #include <Catena.h>
 #include <mcciadk_baselib.h>
 #include <stdlib.h>
@@ -311,6 +312,12 @@ public:
     // concrete type for uplink data buffer
     using TxBuffer_t = McciCatena::AbstractTxBuffer_t<MeasurementFormat::kTxBufferSize>;
 
+    // concrete type for flash parameters
+    using Flash_t = McciCatena::FlashParamsStm32L0_t;
+    using ParamBoard_t = Flash_t::ParamBoard_t;
+    using PageEndSignature1_t = Flash_t::PageEndSignature1_t;
+    using ParamDescId = Flash_t::ParamDescId;
+
     // flag to disable LED
     bool fDisableLED;
 
@@ -323,10 +330,22 @@ public:
     // get Rev number
     std::uint8_t boardRev;
 
+    // fetch the signature
+    const PageEndSignature1_t * const pRomSig =
+            reinterpret_cast<const PageEndSignature1_t *>(Flash_t::kPageEndSignature1Address);
+
+    // get pointer to memory block */
+    uint32_t descAddr = pRomSig->getParamPointer();
+
+    // find the serial number (must be first)
+    const ParamBoard_t * const pBoard = reinterpret_cast<const ParamBoard_t *>(descAddr);
+
     // initialize measurement FSM.
     void begin();
     void end();
     bool flashParam();
+    void printBoardInfo();
+    bool isVersion2();
     void setTxCycleTime(
         std::uint32_t txCycleSec,
         std::uint32_t txCycleCount

@@ -20,7 +20,6 @@ Author:
 #include <arduino_lmic.h>
 #include <Catena_Timer.h>
 #include <Catena4430.h>
-#include <Catena_FlashParam.h>
 #include <Catena_Date.h>
 #include <Catena4430_cPCA9570.h>
 #include <Catena4430_c4430Gpios.h>
@@ -64,8 +63,6 @@ cDate gDate;
 cTimer ledTimer;
 Catena::LoRaWAN gLoRaWAN;
 StatusLed gLed (Catena::PIN_STATUS_LED);
-
-FlashParamsStm32L0_t::ParamBoard_t gParam;
 
 // the Temperature/Humidity Sensor
 cSHT3x gSht { Wire };

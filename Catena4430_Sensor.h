@@ -48,9 +48,6 @@ extern  McciCatena4430::cMeasurementLoop        gMeasurementLoop;
 //   The flash
 extern  McciCatena::Catena_Mx25v8035f           gFlash;
 
-// The flash parameter
-extern McciCatena::FlashParamsStm32L0_t::ParamBoard_t       gParam;
-
 // the bootloader
 extern  McciCatena::cBootloaderApi              gBootloaderApi;
 

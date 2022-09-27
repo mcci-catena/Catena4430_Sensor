@@ -25,7 +25,6 @@ using namespace McciCatena;
 
 extern c4430Gpios gpio;
 extern cMeasurementLoop gMeasurementLoop;
-extern FlashParamsStm32L0_t::ParamBoard_t gParam;
 
 static constexpr uint8_t kVddPin = D11;
 
@@ -66,11 +65,16 @@ void cMeasurementLoop::begin()
 
     if (!this->flashParam())
         {
-        gCatena.SafePrintf("**Unable to fetch Revision, default set as 'D'!\n");
-        this->boardRev = 1;
+        gCatena.SafePrintf(
+                "**Unable to fetch flash parameters, assuming 4610 version 1 (rev C or earlier)!\n"
+                );
+        this->boardRev = 2;
+        }
+    else {
+        this->printBoardInfo();
         }
 
-    if (this->boardRev < 3)
+    if (!this->isVersion2())
         {
         kMessageFormat = MeasurementFormat::kMessageFormatV1;
 
@@ -106,6 +110,7 @@ void cMeasurementLoop::begin()
         }
     else
         {
+        /* this is a version 2 board (rev D or later) */
         kMessageFormat = MeasurementFormat::kMessageFormatV2;
 
         if (this->m_Sht.begin())
@@ -158,68 +163,87 @@ void cMeasurementLoop::end()
 
 bool cMeasurementLoop::flashParam()
     {
-    // fetch the signature
-    const FlashParamsStm32L0_t::PageEndSignature1_t * const pRomSig = reinterpret_cast<const FlashParamsStm32L0_t::PageEndSignature1_t *>(FlashParamsStm32L0_t::kPageEndSignature1Address);
-    const auto guid { FlashParamsStm32L0_t::kPageEndSignature1_Guid };
+    const auto guid { Flash_t::kPageEndSignature1_Guid };
 
     if (std::memcmp((const void *) &pRomSig->Guid, (const void *) &guid, sizeof(pRomSig->Guid)) != 0)
         {
-        gCatena.SafePrintf("Guid value wrong\n");
+        if (this->isTraceEnabled(this->DebugFlags::kError))
+            gLog.printf(gLog.kError, "Guid value wrong\n");
         return false;
         }
 
-    // get pointer to memory block */
-    uint32_t descAddr = pRomSig->getParamPointer();
-    if (! pRomSig->isValidParamPointer(descAddr))
+    if (! pRomSig->isValidParamPointer(this->descAddr))
         {
-        gCatena.SafePrintf("invalid paramter pointer: %#08x\n", descAddr);
+        if (this->isTraceEnabled(this->DebugFlags::kError))
+            gLog.printf(gLog.kError, "invalid paramter pointer: %#08x\n", this->descAddr);
         return false;
         }
-
-    // find the serial number (must be first)
-    const FlashParamsStm32L0_t::ParamBoard_t * const pBoard =
-        reinterpret_cast<const FlashParamsStm32L0_t::ParamBoard_t *>(descAddr);
 
     // check the ID and length
-    if (! (pBoard->uLen == sizeof(*pBoard) && pBoard->uType == unsigned(FlashParamsStm32L0_t::ParamDescId::Board)))
+    if (! (
+        this->pBoard->uLen == sizeof(*this->pBoard) &&
+        this->pBoard->uType == unsigned(ParamDescId::Board)
+        ))
         {
-        gCatena.SafePrintf("invalid board length=%02x or type=%02x\n", pBoard->uLen, pBoard->uType);
+        if (this->isTraceEnabled(this->DebugFlags::kError))
+            gLog.printf(
+                    gLog.kError,
+                    "invalid board length=%02x or type=%02x\n",
+                    this->pBoard->uLen,
+                    this->pBoard->uType
+                    );
         return false;
         }
 
-    // at last: print the s/n, model, ECN
-    gCatena.SafePrintf("serial-number:");
-    uint8_t serial[pBoard->nSerial];
-    pBoard->getSerialNumber(serial);
+    this->boardRev = this->pBoard->getRev();
+    return true;
+    }
+
+void cMeasurementLoop::printBoardInfo()
+    {
+    // print the s/n, model, rev
+    gLog.printf(gLog.kInfo, "serial-number:");
+    uint8_t serial[this->pBoard->nSerial];
+    this->pBoard->getSerialNumber(serial);
 
     for (unsigned i = 0; i < sizeof(serial); ++i)
         gCatena.SafePrintf("%c%02x", i == 0 ? ' ' : '-', serial[i]);
 
-    gCatena.SafePrintf(
-        "\nAssembly-number: %u\nModel: %u\n",
-        pBoard->getAssembly(),
-        pBoard->getModel()
-        );
+    gLog.printf(
+            gLog.kInfo,
+            "\nAssembly-number: %u\nModel: %u\n",
+            this->pBoard->getAssembly(),
+            this->pBoard->getModel()
+            );
     delay(1);
-    gCatena.SafePrintf(
-        "ModNumber: %u\n",
-        pBoard->getModNumber()
-        );
-    this->boardRev = pBoard->getRev();
-    gCatena.SafePrintf(
-        "RevNumber: %u\n",
-        this->boardRev
-        );
-    gCatena.SafePrintf(
-        "Rev: %c\n",
-        pBoard->getRevChar()
-        );
-    gCatena.SafePrintf(
-        "Dash: %u\n",
-        pBoard->getDash()
-        );
+    gLog.printf(
+            gLog.kInfo,
+            "ModNumber: %u\n",
+            this->pBoard->getModNumber()
+            );
+    gLog.printf(
+            gLog.kInfo,
+            "RevNumber: %u\n",
+            this->boardRev
+            );
+    gLog.printf(
+            gLog.kInfo,
+            "Rev: %c\n",
+            this->pBoard->getRevChar()
+            );
+    gLog.printf(
+            gLog.kInfo,
+            "Dash: %u\n",
+            this->pBoard->getDash()
+            );
+    }
 
-    return true;
+bool cMeasurementLoop::isVersion2()
+    {
+    if (this->boardRev < 3)
+        return false;
+    else
+        return true;
     }
 
 void cMeasurementLoop::requestActive(bool fEnable)
@@ -583,6 +607,7 @@ void cMeasurementLoop::updateLightMeasurements()
             this->m_fLowLight = false;
         }
 
+    /* this is a version 2 board (rev D or later) */
     if (this->m_fLtr329)
         {
         float currentLux;
