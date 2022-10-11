@@ -613,6 +613,13 @@ void cMeasurementLoop::updateLightMeasurements()
         float currentLux;
         bool fHardError;
 
+        static constexpr float kMax_Gain_96 = 640.0f;
+        static constexpr float kMax_Gain_48 = 1280.0f;
+        static constexpr float kMax_Gain_8 = 7936.0f;
+        static constexpr float kMax_Gain_4 = 16128.0f;
+        static constexpr float kMax_Gain_2 = 32512.0f;
+        static constexpr float kMax_Gain_1 = 65535.0f;
+
         while (! this->m_Ltr.queryReady(fHardError))
             {
             if (fHardError)
@@ -636,6 +643,19 @@ void cMeasurementLoop::updateLightMeasurements()
 
             this->m_data.flags |= Flags::Light;
             this->m_data.light.Lux = currentLux;
+
+            if (currentLux <= kMax_Gain_96)
+                m_AlsCtrl.setGain(96);
+            else if (currentLux <= kMax_Gain_48)
+                m_AlsCtrl.setGain(48);
+            else if (currentLux <= kMax_Gain_8)
+                m_AlsCtrl.setGain(8);
+            else if (currentLux <= kMax_Gain_4)
+                m_AlsCtrl.setGain(4);
+            else if (currentLux <= kMax_Gain_2)
+                m_AlsCtrl.setGain(2);
+            else
+                m_AlsCtrl.setGain(1);
 
             if (currentLux <= 100)
                 this->m_fLowLight = true;

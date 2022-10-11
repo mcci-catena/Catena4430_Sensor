@@ -462,6 +462,7 @@ private:
     // used in Catena4610 V2 boards
     McciCatenaSht3x::cSHT3x&        m_Sht;
     Mcci_Ltr_329als::Ltr_329als&    m_Ltr;
+    Mcci_Ltr_329als_Regs::AlsContr_t    m_AlsCtrl;
 
     // second SPI class
     SPIClass                        *m_pSPI2;
