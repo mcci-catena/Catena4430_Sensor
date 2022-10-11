@@ -132,7 +132,7 @@ cMeasurementLoop::fillTxBuffer(
                     (int) mData.light.Lux
                     );
 
-            b.putLux(LMIC_f2uflt16(mData.light.Lux / pow(2.0, 24)));
+            b.put3f(mData.light.Lux);
             }
         }
 
