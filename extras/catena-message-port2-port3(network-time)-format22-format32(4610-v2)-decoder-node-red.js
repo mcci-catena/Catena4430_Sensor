@@ -203,6 +203,63 @@ function DecodeI16(Parse) {
     return result;
 }
 
+function DecodeU24(Parse) {
+    var i = Parse.i;
+    var bytes = Parse.bytes;
+
+    var result = (bytes[i + 0] << 16) + (bytes[i + 1] << 8) + bytes[i + 2];
+    Parse.i = i + 3;
+
+    return result;
+}
+
+function DecodeSflt24(Parse)
+    {
+    var rawSflt24 = DecodeU24(Parse);
+    // rawSflt24 is the 3-byte number decoded from wherever;
+    // it's in range 0..0xFFFFFF
+    // bit 23 is the sign bit
+    // bits 22..16 are the exponent
+    // bits 15..0 are the the mantissa. Unlike IEEE format,
+    // the msb is explicit; this means that numbers
+    // might not be normalized, but makes coding for
+    // underflow easier.
+    // As with IEEE format, negative zero is possible, so
+    // we special-case that in hopes that JavaScript will
+    // also cooperate.
+    //
+    // The result is a number in the open interval (-1.0, 1.0);
+    //
+
+    // throw away high bits for repeatability.
+    rawSflt24 &= 0xFFFFFF;
+
+    // special case minus zero:
+    if (rawSflt24 === 0x800000)
+        return -0.0;
+
+    // extract the sign.
+    var sSign = ((rawSflt24 & 0x800000) !== 0) ? -1 : 1;
+
+    // extract the exponent
+    var exp1 = (rawSflt24 >> 16) & 0x7F;
+
+    // extract the "mantissa" (the fractional part)
+    var mant1 = (rawSflt24 & 0xFFFF) / 32768.0;
+
+    // convert back to a floating point number. We hope
+    // that Math.pow(2, k) is handled efficiently by
+    // the JS interpreter! If this is time critical code,
+    // you can replace by a suitable shift and divide.
+    var f_unscaled = sSign * mant1 * Math.pow(2, exp1 - 23);
+
+    return f_unscaled;
+    }
+
+function DecodeLux(Parse) {
+    return DecodeSflt24(Parse);
+}
+
 function DecodeI32(Parse) {
     var i = Parse.i;
     var bytes = Parse.bytes;
@@ -312,7 +369,7 @@ function Decoder(bytes, port) {
         }
         else if (uFormat === 0x32) {
             // we have light
-            decoded.lux = DecodeLight(Parse) * Math.pow(2.0, 24);
+            decoded.lux = DecodeLux(Parse);
         }
     }
 
