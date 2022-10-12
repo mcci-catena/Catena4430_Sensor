@@ -227,33 +227,35 @@ function DecodeSflt24(Parse)
     // As with IEEE format, negative zero is possible, so
     // we special-case that in hopes that JavaScript will
     // also cooperate.
-    //
-    // The result is a number in the open interval (-1.0, 1.0);
-    //
 
-    // throw away high bits for repeatability.
-    rawSflt24 &= 0xFFFFFF;
+    // extract sign, exponent, mantissa
+    var bSign     = (rawSflt24 & 0x800000) ? true : false;
+    var uExp      = (rawSflt24 & 0x7F0000) >> 16;
+    var uMantissa = (rawSflt24 & 0x00FFFF);
 
-    // special case minus zero:
-    if (rawSflt24 === 0x800000)
-        return -0.0;
+    // if non-numeric, return appropriate result.
+    if (uExp === 0x7F) {
+        if (uMantissa === 0)
+            return bSign ? Number.NEGATIVE_INFINITY
+                    : Number.POSITIVE_INFINITY;
+        else
+            return Number.NaN;
+    // else unless denormal, set the 1.0 bit
+    } else if (uExp !== 0) {
+        uMantissa += 0x010000;
+    } else { // denormal: exponent is the minimum
+        uExp = 1;
+    }
 
-    // extract the sign.
-    var sSign = ((rawSflt24 & 0x800000) !== 0) ? -1 : 1;
+    // make a floating mantissa in [0,2); usually [1,2), but
+    // sometimes (0,1) for denormals, and exactly zero for zero.
+    var mantissa = uMantissa / 0x010000;
 
-    // extract the exponent
-    var exp1 = (rawSflt24 >> 16) & 0x7F;
+    // apply the exponent.
+    mantissa = Math.pow(2, uExp - 63) * mantissa;
 
-    // extract the "mantissa" (the fractional part)
-    var mant1 = (rawSflt24 & 0xFFFF) / 32768.0;
-
-    // convert back to a floating point number. We hope
-    // that Math.pow(2, k) is handled efficiently by
-    // the JS interpreter! If this is time critical code,
-    // you can replace by a suitable shift and divide.
-    var f_unscaled = sSign * mant1 * Math.pow(2, exp1 - 23);
-
-    return f_unscaled;
+    // apply sign and return result.
+    return bSign ? -mantissa : mantissa;
     }
 
 function DecodeLux(Parse) {
