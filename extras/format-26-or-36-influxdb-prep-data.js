@@ -1,15 +1,15 @@
 /*
 
-Name:   format-22-influxdb-prep-data.js
+Name:   format-26-or-36-influxdb-prep-data.js
 
 Function:
-    Decode port 0x01 format 0x22 messages for Node-RED.
+    Decode port 0x02/0x03/0x04 format 0x26/0x36 messages for Node-RED.
 
 Copyright and License:
     See accompanying LICENSE file at https://github.com/mcci-catena/MCCI-Catena-4430/
 
 Author:
-    Terry Moore, MCCI Corporation   October 2019
+    Dhinesh Kumar Pitchai, MCCI Corporation   November 2022
 
 */
 
@@ -63,7 +63,7 @@ fields.message_raw = toHexBuffer(msg.payload_raw);
 
 // array of names of items in msg.payload, each match to be copied as a value.
 var field_keys = [
-    "counter", "Vbat", "Vbus", "Vsys", "boot", "tempC", "tDewC", "tHeatIndexC", "p", "p0", "rh", "irradiance", "pellets", "activity"
+    "counter", "Vbat", "Vbus", "Vsys", "boot", "tempC", "tDewC", "tHeatIndexC", "p", "p0", "rh", "irradiance", "lux", "pellets", "activity", "version", "co2", "NwTime"
 ];
 
 // array of names of items in msg.payload, each match to be copied as a tag
@@ -116,6 +116,12 @@ if ("counter" in msg) {
 // minute previously (going back in time).
 if ("activity" in msg.payload) {
     for (var i = 1; i < msg.payload.activity.length; ++i) {
+        var activityInterval = 1;   // by default set activity interval to one minute
+        
+        // if uplink port is 4, then set activity interval to ten minutes
+        if (msg.port === 4)
+            activityInterval = 10;
+
         var thisPoint = initFieldsAndTags(
                             msg,
                             // back up the right number of minutes.

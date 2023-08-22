@@ -16,6 +16,7 @@ Author:
 #ifndef _Catena4430_cMeasurementLoop_h_
 # define _Catena4430_cMeasurementLoop_h_
 
+#include <stdint.h>
 #pragma once
 
 #include <Arduino.h>
@@ -31,7 +32,10 @@ Author:
 #include <Catena_Si1133.h>
 #include <Catena_Timer.h>
 #include <Catena_TxBuffer.h>
+#include <Catena_FlashParam.h>
 #include <Catena.h>
+#include <MCCI_Catena_SCD30.h>
+#include <SD.h>
 #include <mcciadk_baselib.h>
 #include <stdlib.h>
 #include "Catena4430_cPelletFeeder.h"
@@ -59,73 +63,10 @@ class cMeasurementBase
 
     };
 
-class cMeasurementFormat21
-    {
-public:
-    static constexpr uint8_t kMessageFormat = 0x22;
-    enum class Flags : uint8_t
-        {
-        Vbat = 1 << 0,      // vBat
-        Vcc = 1 << 1,       // system voltage
-        Vbus = 1 << 2,      // Vbus input
-        Boot = 1 << 3,      // boot count
-        TPH = 1 << 4,       // temperature, pressure, humidity
-        Light = 1 << 5,     // light (IR, white, UV)
-        Activity = 1 << 6,  // Activity (min/max/avg)
-        };
-
-    // buffer size for uplink data
-    static constexpr size_t kTxBufferSize = 36;
-
-    // the structure of a measurement
-    struct Measurement
-        {
-        McciCatena::cDate           DateTime;
-        cMeasurementFormat21::Flags  flags;
-        float                       vBat;
-        float                       vSystem;
-        float                       vBus;
-        uint32_t                    BootCount;
-        struct Env
-            {
-            float                   Temperature;
-            float                   Pressure;
-            float                   Humidity;
-            } env;
-        struct Light
-            {
-            std::uint16_t           IR;
-            std::uint16_t           White;
-            std::uint16_t           UV;
-            } light;
-        struct Activity
-            {
-            float                   Min;
-            float                   Max;
-            float                   Avg;
-            } activity;
-        };
-    };
-
-
 template <unsigned a_kMaxActivityEntries>
-class cMeasurementFormat22 : public cMeasurementBase
+class cMeasurementFormat : public cMeasurementBase
     {
 public:
-    static constexpr uint8_t kMessageFormat = 0x22;
-
-    enum class Flags : uint8_t
-            {
-            Vbat = 1 << 0,      // vBat
-            Vcc = 1 << 1,       // system voltage
-            Vbus = 1 << 2,      // Vbus input
-            Boot = 1 << 3,      // boot count
-            TPH = 1 << 4,       // temperature, pressure, humidity
-            Light = 1 << 5,     // light (IR, white, UV)
-            Pellets = 1 << 6,   // Pellet count
-            Activity = 1 << 7,  // Activity (min/max/avg)
-            };
-
     static constexpr unsigned kMaxActivityEntries = a_kMaxActivityEntries;
     static constexpr unsigned kMaxPelletEntries = 2;
     static constexpr size_t kTxBufferSize = (1 + 4 + 1 + 2 + 2 + 2 + 1 + 6 + 2 + 6 + kMaxActivityEntries * 2);
@@ -137,22 +78,10 @@ public:
         // the subtypes:
         //----------------
 
-        // environmental measurements
-        struct Env
+        // measure co2ppm
+        struct CO2ppm
             {
-            // temperature (in degrees C)
-            float                   Temperature;
-            // pressure (in millibars/hPa)
-            float                   Pressure;
-            // humidity (in % RH)
-            float                   Humidity;
-            };
-
-        // ambient light measurements
-        struct Light
-            {
-            // "white" light, in w/m^2
-            float                   White;
+            float                   CO2ppm;
             };
 
         // count of food pellets
@@ -170,6 +99,15 @@ public:
             float                   Avg;
             };
 
+        // version number
+        struct Version
+            {
+            std::uint8_t            Major;
+            std::uint8_t            Minor;
+            std::uint8_t            Patch;
+            std::uint8_t            Local;
+            };
+
         //---------------------------
         // the actual members as POD
         //---------------------------
@@ -177,44 +115,48 @@ public:
         // time of most recent activity measurement
         McciCatena::cDate           DateTime;
 
-        // flags of entries that are valid.
-        Flags                       flags;
         // count of valid activity measurements
         std::uint8_t                nActivity;
 
         // measured battery voltage, in volts
         float                       Vbat;
-        // measured system Vdd voltage, in volts
-        float                       Vsystem;
         // measured USB bus voltage, in volts.
         float                       Vbus;
         // boot count
         uint32_t                    BootCount;
-        // environmental data
-        Env                         env;
-        // ambient light
-        Light                       light;
+        // measure co2ppm
+        CO2ppm                      co2ppm;
         // food pellet tracking.
         Pellets                     pellets[kMaxPelletEntries];
         // array of potential activity measurements.
         Activity                    activity[kMaxActivityEntries];
+        // version number
+        Version                     ver;
         };
     };
 
 class cMeasurementLoop : public McciCatena::cPollableObject
     {
 public:
+    // version parameters
+    static constexpr std::uint8_t kMajor = 2;
+    static constexpr std::uint8_t kMinor = 1;
+    static constexpr std::uint8_t kPatch = 0;
+    static constexpr std::uint8_t kLocal = 0;
+
     // some parameters
-    static constexpr std::uint8_t kUplinkPort = 2;
+    static constexpr std::uint8_t kUplinkPortDefault = 2;
     static constexpr std::uint8_t kUplinkPortwithNwTime = 3;
+    static constexpr std::uint8_t kUplinkPortDataLimit = 4;
     static constexpr bool kEnableDeepSleep = false;
     static constexpr unsigned kMaxActivityEntries = 8;
-    using MeasurementFormat = cMeasurementFormat22<kMaxActivityEntries>;
+    using MeasurementFormat = cMeasurementFormat<kMaxActivityEntries>;
     static constexpr unsigned kMaxPelletEntries = MeasurementFormat::kMaxPelletEntries;
     using Measurement = MeasurementFormat::Measurement;
-    using Flags = MeasurementFormat::Flags;
-    static constexpr std::uint8_t kMessageFormat = MeasurementFormat::kMessageFormat;
+    std::uint8_t kMessageFormat;
     static constexpr std::uint8_t kSdCardCSpin = D5;
+    using Flash_t = McciCatena::FlashParamsStm32L0_t;
+    using ParamBoard_t = Flash_t::ParamBoard_t;
 
     void deepSleepPrepare();
     void deepSleepRecovery();
@@ -246,8 +188,11 @@ public:
         , m_txCycleSec(60)                  // initial uplink interval
         , m_txCycleCount(10)                // initial count of fast uplinks
         , m_rtcSetSec(8 * 60 * 60)          // set RTC time every 8 hours
+        , m_versionSec(4 * 60 * 60)         // send Version every 6 hours
         , m_DebugFlags(DebugFlags(kError | kTrace))
         , m_ActivityTimerSec(60)            // the activity time sample interval
+        , m_ActivityDataLimitTimerSec(9 * 60)    // the time sample interval to limit data
+        , m_txCycleSec_Low_Power(60 * 60)   // uplink interval when Vbat < 3.2V
         {};
 
     // neither copyable nor movable
@@ -297,15 +242,77 @@ public:
 
     // concrete type for uplink data buffer
     using TxBuffer_t = McciCatena::AbstractTxBuffer_t<MeasurementFormat::kTxBufferSize>;
+    using TxBufferBase_t = McciCatena::AbstractTxBufferBase_t;
+
+    // Uplink port
+    std::uint8_t uplinkPort;
 
     // flag to disable LED
     bool fDisableLED;
 
+    // set true if light sensor detects low light
+    bool m_fLowLight: 1;
+
     // set flag if Network time set to RTC
     bool fNwTimeSet;
 
+    // flag to if data being read and ready to transmit
+    bool fData_Vbat;
+    bool fData_Version;
+    bool fData_CO2;
+    bool fData_BootCount;
+    bool fData_Activity;
+    bool fData_Pellet;
+
     // set start time when network time is being set
     std::uint32_t startTime;
+
+    // SCD30 - CO2 sensor
+    McciCatenaScd30::cSCD30 m_Scd{Wire};
+
+    // variables to store scd30 data
+    char ts;
+    int32_t t100;
+    int32_t tint;
+    int32_t tfrac;
+    int32_t rh100;
+    int32_t rhint;
+    int32_t rhfrac;
+    int32_t co2_100;
+    int32_t co2int;
+    int32_t co2frac;
+
+    // initializtion of cMeasurement
+    cMeasurementLoop *constructInstanceForHardware(bool ver);
+
+    // things that are in any measurement loop variant, and then...
+    virtual void beginSensors(void){
+        gCatena.SafePrintf("error: beginSensors(): points to Base Class");
+        }
+    virtual bool takeMeasurements(void){
+        gCatena.SafePrintf("error: takeMeasurements(): points to Base Class");
+        }
+    virtual bool formatMeasurements(TxBuffer_t &b, Measurement const &mData){
+        gCatena.SafePrintf("error: formatMeasurements(): points to Base Class");
+        }
+    virtual bool clearMeasurements(void){
+        gCatena.SafePrintf("error: clearMeasurements() points to Base Class");
+        }
+    virtual void writeVersionData(File dataFile){
+        gCatena.SafePrintf("error: writeVersionData(): points to Base Class");
+        }
+
+    void setBoardRev(uint8_t boardRev)
+        {
+        // set the board revision.
+        this->m_boardRev = boardRev;
+        }
+    uint8_t readBoardRev()
+        {
+        // return the board revision.
+        return this->m_boardRev;
+        }
+    const ParamBoard_t * m_pBoard;
 
     // initialize measurement FSM.
     void begin();
@@ -327,15 +334,27 @@ public:
         return this->m_txCycleSec;
         }
     virtual void poll() override;
-    void setBme280(bool fEnable)
-        {
-        this->m_fBme280 = fEnable;
-        }
     void setVbus(float Vbus)
         {
         // set threshold value as 4.0V as there is reverse voltage
         // in vbus(~3.5V) while powered from battery in 4610. 
         this->m_fUsbPower = (Vbus > 4.0f) ? true : false;
+        }
+
+    // fetch and print SCD30 device related information
+    void printSCDinfo()
+        {
+        auto const info = m_Scd.getInfo();
+        gCatena.SafePrintf(
+                    "Found sensor: firmware version %u.%u\n",
+                    info.FirmwareVersion / 256u,
+                    info.FirmwareVersion & 0xFFu
+                    );
+        gCatena.SafePrintf("  Automatic Sensor Calibration: %u\n", info.fASC_status);
+        gCatena.SafePrintf("  Sample interval:      %6u secs\n", info.MeasurementInterval);
+        gCatena.SafePrintf("  Forced Recalibration: %6u ppm\n", info.ForcedRecalibrationValue);
+        gCatena.SafePrintf("  Temperature Offset:   %6d centi-C\n", info.TemperatureOffset);
+        gCatena.SafePrintf("  Altitude:             %6d meters\n", info.AltitudeCompensation);
         }
 
     // request that the measurement loop be active/inactive
@@ -359,23 +378,30 @@ public:
     /// tear down the SD card.
     void sdFinish();
 
+    // timeout handling
+
+    // set the timer
+    void setTimer(std::uint32_t ms);
+    // clear the timer
+    void clearTimer();
+    // test (and clear) the timed-out flag.
+    bool timedOut();
+
 private:
     // sleep handling
     void sleep();
     bool checkDeepSleep();
     void doSleepAlert(bool fDeepSleep);
     void doDeepSleep();
-    // void deepSleepPrepare();
-    // void deepSleepRecovery();
 
     // read data
     void updateSynchronousMeasurements();
-    void updateLightMeasurements();
+    void updateScd30Measurements();
     void resetMeasurements();
     void measureActivity();
 
     // telemetry handling.
-    void fillTxBuffer(TxBuffer_t &b, Measurement const & mData);
+    // void fillTxBuffer(TxBuffer_t &b, Measurement const & mData);
     void startTransmission(TxBuffer_t &b);
     void sendBufferDone(bool fSuccess);
     bool txComplete()
@@ -404,23 +430,11 @@ private:
     void resetPirAccumulation(void);
     void accumulatePirData(void);
 
-    // timeout handling
-
-    // set the timer
-    void setTimer(std::uint32_t ms);
-    // clear the timer
-    void clearTimer();
-    // test (and clear) the timed-out flag.
-    bool timedOut();
-
     // instance data
 private:
     McciCatena::cFSM<cMeasurementLoop, State> m_fsm;
     // evaluate the control FSM.
     State fsmDispatch(State currentState, bool fEntry);
-
-    Adafruit_BME280                 m_BME280;
-    McciCatena::Catena_Si1133       m_si1133;
 
     // second SPI class
     SPIClass                        *m_pSPI2;
@@ -442,18 +456,19 @@ private:
     // set true to request transition to inactive uplink mode; cleared by FSM
     bool                            m_rqInactive : 1;
 
+    // set true if CO2 (SCD) is present
+    bool                            m_fScd30 : 1;
+    // set true if device enters Sleep state
+    bool                            m_fSleepScd30 : 1;
+    // set true if measurement is valid
+    bool                            m_measurement_valid: 1;
+
     // set true if event timer times out
     bool                            m_fTimerEvent : 1;
     // set true while evenet timer is active.
     bool                            m_fTimerActive : 1;
     // set true if USB power is present.
     bool                            m_fUsbPower : 1;
-    // set true if BME280 is present
-    bool                            m_fBme280 : 1;
-    // set true if SI1133 is present
-    bool                            m_fSi1133: 1;
-    // set true if SI1133 detects low light
-    bool                            m_fLowLight: 1;
 
     // set true while a transmit is pending.
     bool                            m_txpending : 1;
@@ -467,6 +482,13 @@ private:
     bool                            m_fSpi2Active: 1;
     // set true when we've BIN file in SD card to update
     bool                            m_fFwUpdate : 1;
+    // set true when Vbat is less than the minimum threshold (3.3V)
+    bool                            m_fDatalimit: 1;
+    // set true when Version is sent Over the Air
+    bool                            m_fVersionOta: 1;
+
+    // catena board flash parameters
+    std::uint8_t                    m_boardRev;
 
     // PIR sample control
     cPIRdigital                     m_pir;
@@ -484,15 +506,22 @@ private:
     // activity time control
     McciCatena::cTimer              m_ActivityTimer;
     std::uint32_t                   m_ActivityTimerSec;
+    std::uint32_t                   m_ActivityDataLimitTimerSec;
 
     // uplink time control
     McciCatena::cTimer              m_UplinkTimer;
     std::uint32_t                   m_txCycleSec;
     std::uint32_t                   m_txCycleCount;
     std::uint32_t                   m_txCycleSec_Permanent;
+    std::uint32_t                   m_txCycleSec_Low_Power;
 
     // RTC set time control
     std::uint32_t                   m_rtcSetSec;
+
+    // Version OTA - time control
+    std::uint32_t                   m_versionSec;
+    std::uint32_t                   m_startTimeMs;
+    std::uint32_t                   m_currentIntervalSec;
 
     // simple timer for timing-out sensors.
     std::uint32_t                   m_timer_start;
@@ -505,25 +534,6 @@ private:
     Measurement                     m_FileData;
     TxBuffer_t                      m_FileTxBuffer;
     };
-
-//
-// operator overloads for ORing structured flags
-//
-static constexpr cMeasurementLoop::Flags operator| (const cMeasurementLoop::Flags lhs, const cMeasurementLoop::Flags rhs)
-        {
-        return cMeasurementLoop::Flags(uint8_t(lhs) | uint8_t(rhs));
-        };
-
-static constexpr cMeasurementLoop::Flags operator& (const cMeasurementLoop::Flags lhs, const cMeasurementLoop::Flags rhs)
-        {
-        return cMeasurementLoop::Flags(uint8_t(lhs) & uint8_t(rhs));
-        };
-
-static cMeasurementLoop::Flags operator|= (cMeasurementLoop::Flags &lhs, const cMeasurementLoop::Flags &rhs)
-        {
-        lhs = lhs | rhs;
-        return lhs;
-        };
 
 } // namespace McciCatena4430
 
