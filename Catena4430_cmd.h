@@ -20,6 +20,8 @@ Author:
 
 #include <Catena_CommandStream.h>
 
+McciCatena::cCommandStream::CommandFn cmdInterval;
+McciCatena::cCommandStream::CommandFn cmdInfo;
 McciCatena::cCommandStream::CommandFn cmdDate;
 McciCatena::cCommandStream::CommandFn cmdLog;
 McciCatena::cCommandStream::CommandFn cmdDir;

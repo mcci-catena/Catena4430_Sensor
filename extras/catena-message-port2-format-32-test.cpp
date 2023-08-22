@@ -9,7 +9,7 @@ Copyright and License:
     See accompanying LICENSE file at https://github.com/mcci-catena/MCCI-Catena-4430/
 
 Author:
-    Terry Moore, MCCI Corporation   August 2019
+    Dhinesh Kumar Pitchai, MCCI Corporation   November 2022
 
 */
 

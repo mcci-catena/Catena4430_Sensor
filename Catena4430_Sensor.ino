@@ -20,6 +20,7 @@ Author:
 #include <arduino_lmic.h>
 #include <Catena_Timer.h>
 #include <Catena4430.h>
+#include <Catena_FlashParam.h>
 #include <Catena_Date.h>
 #include <Catena4430_cPCA9570.h>
 #include <Catena4430_c4430Gpios.h>
@@ -27,10 +28,12 @@ Author:
 #include "Catena4430_cMeasurementLoop.h"
 #include "Catena4430_cmd.h"
 #include <Catena4430_cClockDriver_PCF8523.h>
+#include <MCCI_Catena_SCD30.h>
 
 extern McciCatena::Catena gCatena;
 using namespace McciCatena4430;
 using namespace McciCatena;
+using namespace McciCatenaScd30;
 
 static_assert(
     CATENA_ARDUINO_PLATFORM_VERSION_COMPARE_GE(
@@ -40,7 +43,7 @@ static_assert(
     "This sketch requires Catena-Arduino-Platform v0.21.0-5 or later"
     );
 
-constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(1,2,0,1);
+constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(2,1,0,0);
 constexpr std::uint32_t kDoubleResetWaitMs = 3000;
 constexpr std::uint32_t kSetDoubleResetMagic = 0xCA44301;
 constexpr std::uint32_t kClearDoubleResetMagic = 0xCA44300;
@@ -50,6 +53,7 @@ constexpr std::uint32_t kClearDoubleResetMagic = 0xCA44300;
 |   Variables.
 |
 \****************************************************************************/
+
 
 // the global I2C GPIO object
 cPCA9570                i2cgpio    { &Wire };
@@ -64,14 +68,28 @@ cTimer ledTimer;
 Catena::LoRaWAN gLoRaWAN;
 StatusLed gLed (Catena::PIN_STATUS_LED);
 
-// the Temperature/Humidity Sensor
-cSHT3x gSht { Wire };
+// allocate the buffer for cMeasurementLoop.
+constexpr auto alignData = alignof(cMeasurementLoop);
+constexpr size_t bufSize = sizeof(cMeasurementLoop);
+static alignas(alignData) uint8_t buf[bufSize];
 
-// the light Sensor
-Ltr_329als gLtr {Wire};
+//
+// The concrete instance for class `cMeasurementLoop` varies at runtime
+// according to the hardware in use.
+// This pointer is to the concrete
+// instance viewed as an abstract object;
+// virtual methods are provided by
+// the concrete type to allow portable
+// code to access the concrete hardware
+// without knowing what type is in use.
+//
+cMeasurementLoop *gpMeasurementLoopConcrete = new(buf) cMeasurementLoop();
 
-// the measurement loop instance
-cMeasurementLoop gMeasurementLoop { gSht, gLtr };
+// concrete type for flash parameters
+using Flash_t = McciCatena::FlashParamsStm32L0_t;
+using ParamBoard_t = Flash_t::ParamBoard_t;
+using PageEndSignature1_t = Flash_t::PageEndSignature1_t;
+using ParamDescId = Flash_t::ParamDescId;
 
 /* instantiate the bootloader API */
 cBootloaderApi gBootloaderApi;
@@ -109,6 +127,8 @@ static const cCommandStream::cEntry sMyExtraCommmands[] =
         { "dir", cmdDir },
         { "log", cmdLog },
         { "tree", cmdDir },
+        { "info", cmdInfo },
+        { "interval", cmdInterval },
         // other commands go here....
         };
 
@@ -132,11 +152,22 @@ void setup()
     {
     setup_double_reset();
 
+    /* // allocate the buffer for cMeasurementLoop.
+    constexpr auto alignData = alignof(cMeasurementLoop);
+    constexpr size_t bufSize = sizeof(cMeasurementLoop);
+    static alignas(alignData) uint8_t buf[bufSize];
+
+    // initialize a measurement loop object, using the buffer
+    // as the underlying memory. This runs the constructors.
+    gpMeasurementLoopConcrete = new(buf) cMeasurementLoop(); */
+
+    setup_version();
+
     setup_platform();
     setup_printSignOn();
 
-    setup_flash();
     setup_radio();
+    setup_flash();
     setup_download();
     setup_measurement();
     setup_gpio();
@@ -189,7 +220,7 @@ void setup_platform()
     if (fToggle)
         {
         // check if LEDs are disabled
-        if (savedFlag & static_cast<uint32_t>(gMeasurementLoop.OPERATING_FLAGS::fDisableLed))
+        if (savedFlag & static_cast<uint32_t>(gpMeasurementLoopConcrete->OPERATING_FLAGS::fDisableLed))
             {
             // clear flag to disable LEDs
             savedFlag &= clearDisableLedFlag;
@@ -233,6 +264,7 @@ void setup_printSignOn()
 
     gCatena.SafePrintf("\n%s%s\n", dashes, dashes);
 
+    // need username as other libraries has similar get version APIs
     gCatena.SafePrintf("This is %s v%d.%d.%d-%d.\n",
         filebasename(__FILE__),
         McciCatena4430::getMajor(kAppVersion),
@@ -259,10 +291,105 @@ void setup_printSignOn()
     gCatena.SafePrintf("%s%s\n" "\n", dashes, dashes);
     }
 
+bool flashParam()
+    {
+    // fetch the signature
+    const PageEndSignature1_t * const pRomSig =
+            reinterpret_cast<const PageEndSignature1_t *>(Flash_t::kPageEndSignature1Address);
+
+    // get pointer to memory block */
+    uint32_t const descAddr = pRomSig->getParamPointer();
+
+    // find the serial number (must be first)
+    gpMeasurementLoopConcrete->m_pBoard = reinterpret_cast<const ParamBoard_t *>(descAddr);
+
+    const auto guid { Flash_t::kPageEndSignature1_Guid };
+
+    if (std::memcmp((const void *) &pRomSig->Guid, (const void *) &guid, sizeof(pRomSig->Guid)) != 0)
+        {
+        if (gpMeasurementLoopConcrete->isTraceEnabled(cMeasurementLoop::DebugFlags::kError))
+            gLog.printf(gLog.kError, "Guid value wrong\n");
+        return false;
+        }
+
+    if (! pRomSig->isValidParamPointer(descAddr))
+        {
+        if (gpMeasurementLoopConcrete->isTraceEnabled(cMeasurementLoop::DebugFlags::kError))
+            gLog.printf(gLog.kError, "invalid paramter pointer: %#08x\n", descAddr);
+        return false;
+        }
+
+    // check the ID and length
+    if (! (
+        gpMeasurementLoopConcrete->m_pBoard->uLen == sizeof(*gpMeasurementLoopConcrete->m_pBoard) &&
+        gpMeasurementLoopConcrete->m_pBoard->uType == unsigned(ParamDescId::Board)
+        ))
+        {
+        if (gpMeasurementLoopConcrete->isTraceEnabled(cMeasurementLoop::DebugFlags::kError))
+            gLog.printf(
+                    gLog.kError,
+                    "invalid board length=%02x or type=%02x\n",
+                    gpMeasurementLoopConcrete->m_pBoard->uLen,
+                    gpMeasurementLoopConcrete->m_pBoard->uType
+                    );
+        return false;
+        }
+
+    gpMeasurementLoopConcrete->setBoardRev(gpMeasurementLoopConcrete->m_pBoard->getRev());
+    return true;
+    }
+
+void printBoardInfo()
+    {
+    // print the s/n, model, rev
+    gLog.printf(gLog.kInfo, "serial-number:");
+    uint8_t serial[gpMeasurementLoopConcrete->m_pBoard->nSerial];
+    gpMeasurementLoopConcrete->m_pBoard->getSerialNumber(serial);
+
+    for (unsigned i = 0; i < sizeof(serial); ++i)
+        gCatena.SafePrintf("%c%02x", i == 0 ? ' ' : '-', serial[i]);
+
+    gLog.printf(
+            gLog.kInfo,
+            "\nAssembly-number: %u\nModel: %u\n",
+            gpMeasurementLoopConcrete->m_pBoard->getAssembly(),
+            gpMeasurementLoopConcrete->m_pBoard->getModel()
+            );
+    delay(1);
+    gLog.printf(
+            gLog.kInfo,
+            "ModNumber: %u\n",
+            gpMeasurementLoopConcrete->m_pBoard->getModNumber()
+            );
+    gLog.printf(
+            gLog.kInfo,
+            "RevNumber: %u\n",
+            gpMeasurementLoopConcrete->readBoardRev()
+            );
+    gLog.printf(
+            gLog.kInfo,
+            "Rev: %c\n",
+            gpMeasurementLoopConcrete->m_pBoard->getRevChar()
+            );
+    gLog.printf(
+            gLog.kInfo,
+            "Dash: %u\n",
+            gpMeasurementLoopConcrete->m_pBoard->getDash()
+            );
+    }
+
+bool isVersion2()
+    {
+    if (gpMeasurementLoopConcrete->readBoardRev() < 3)
+        return false;
+    else
+        return true;
+    }
+
 void setup_gpio()
     {
     if (! gpio.begin())
-        Serial.println("GPIO failed to initialize");
+        gCatena.SafePrintf("GPIO failed to initialize\n");
 
     ledTimer.begin(400);
 
@@ -272,9 +399,9 @@ void setup_gpio()
     gLed.Set(LedPattern::FastFlash);
 
     if ((gCatena.GetOperatingFlags() &
-        static_cast<uint32_t>(gMeasurementLoop.OPERATING_FLAGS::fDisableLed)))
+        static_cast<uint32_t>(gpMeasurementLoopConcrete->OPERATING_FLAGS::fDisableLed)))
         {
-        gMeasurementLoop.fDisableLED = true;
+        gpMeasurementLoopConcrete->fDisableLED = true;
         gLed.Set(McciCatena::LedPattern::Off);
         }
     }
@@ -287,7 +414,7 @@ void setup_rtc()
     cDate d;
     if (! gClock.get(d))
         {
-        if (!gMeasurementLoop.fDisableLED)
+        if (!gpMeasurementLoopConcrete->fDisableLED)
             {
             uint8_t nBlink = 0;
             while (nBlink < 5)
@@ -319,7 +446,7 @@ void setup_flash(void)
     gSPI2.begin();
     if (gFlash.begin(&gSPI2, Catena::PIN_SPI2_FLASH_SS))
         {
-        gMeasurementLoop.registerSecondSpi(&gSPI2);
+        gpMeasurementLoopConcrete->registerSecondSpi(&gSPI2);
         gFlash.powerDown();
         gCatena.SafePrintf("FLASH found, put power down\n");
         }
@@ -331,6 +458,22 @@ void setup_flash(void)
         }
     }
 
+void setup_version(void)
+    {
+    if (!flashParam())
+        {
+        gCatena.SafePrintf(
+                "**Unable to fetch flash parameters, assuming 4610 version 1 (rev C or earlier)!\n"
+                );
+        gpMeasurementLoopConcrete->setBoardRev(2);
+        }
+    else {
+        printBoardInfo();
+        }
+
+    gpMeasurementLoopConcrete = gpMeasurementLoopConcrete->constructInstanceForHardware(isVersion2());
+    }
+
 void setup_download()
     {
     gDownload.begin(gFlash, gBootloaderApi);
@@ -340,12 +483,12 @@ void setup_radio()
     {
     gLoRaWAN.begin(&gCatena);
     gCatena.registerObject(&gLoRaWAN);
-    LMIC_setClockError(5 * MAX_CLOCK_ERROR / 100);
+    LMIC_setClockError(10 * MAX_CLOCK_ERROR / 100);
     }
 
 void setup_measurement()
     {
-    gMeasurementLoop.begin();
+    gpMeasurementLoopConcrete->begin();
     }
 
 void setup_commands()
@@ -365,7 +508,7 @@ void setup_commands()
 
 void setup_start()
     {
-    gMeasurementLoop.requestActive(true);
+    gpMeasurementLoopConcrete->requestActive(true);
     }
 
 /****************************************************************************\
@@ -377,8 +520,8 @@ void setup_start()
 void loop()
     {
     gCatena.poll();
-    
-    if (gMeasurementLoop.fDisableLED)
+
+    if (gpMeasurementLoopConcrete->fDisableLED)
         {
         gpio.setGreen(false);
         gpio.setBlue(false);
