@@ -43,7 +43,7 @@ static_assert(
     "This sketch requires Catena-Arduino-Platform v0.21.0-5 or later"
     );
 
-constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(2,1,0,0);
+constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(2,2,0,1);
 constexpr std::uint32_t kDoubleResetWaitMs = 3000;
 constexpr std::uint32_t kSetDoubleResetMagic = 0xCA44301;
 constexpr std::uint32_t kClearDoubleResetMagic = 0xCA44300;
@@ -465,7 +465,8 @@ void setup_version(void)
         gCatena.SafePrintf(
                 "**Unable to fetch flash parameters, assuming 4610 version 1 (rev C or earlier)!\n"
                 );
-        gpMeasurementLoopConcrete->setBoardRev(2);
+        gpMeasurementLoopConcrete->setBoardRev(0);
+        gpMeasurementLoopConcrete->setBoard(0);
         }
     else {
         printBoardInfo();

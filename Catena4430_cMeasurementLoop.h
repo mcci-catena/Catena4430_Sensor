@@ -140,9 +140,9 @@ class cMeasurementLoop : public McciCatena::cPollableObject
 public:
     // version parameters
     static constexpr std::uint8_t kMajor = 2;
-    static constexpr std::uint8_t kMinor = 1;
+    static constexpr std::uint8_t kMinor = 2;
     static constexpr std::uint8_t kPatch = 0;
-    static constexpr std::uint8_t kLocal = 0;
+    static constexpr std::uint8_t kLocal = 1;
 
     // some parameters
     static constexpr std::uint8_t kUplinkPortDefault = 2;
@@ -160,6 +160,24 @@ public:
 
     void deepSleepPrepare();
     void deepSleepRecovery();
+
+    // requests
+    enum DlRequest_t : uint8_t
+        {
+        dlrqReset = 2,
+        dlrqGetVersion,
+        dlrqResetAppEUI,
+        dlrqResetAppKey,
+        dlrqRejoin
+        };
+
+    // downlink error codes
+    enum Error_t : uint8_t
+        {
+        kSuccess = 0,
+        kInvalidLength,
+        kNotSuccess
+        };
 
     enum OPERATING_FLAGS : uint32_t
         {
@@ -312,6 +330,17 @@ public:
         // return the board revision.
         return this->m_boardRev;
         }
+
+    void setBoard(uint16_t board)
+        {
+        // set the board model.
+        this->m_board = board;
+        }
+    uint8_t readBoard()
+        {
+        // return the board model.
+        return this->m_board;
+        }
     const ParamBoard_t * m_pBoard;
 
     // initialize measurement FSM.
@@ -400,6 +429,19 @@ private:
     void resetMeasurements();
     void measureActivity();
 
+    // downlink requests
+    void doDlrqResetInterval(const uint8_t *pMessage, size_t nMessage);
+    void doDlrqResetAppEUI(const uint8_t *pMessage, size_t nMessage);
+    void doDlrqResetAppKey(const uint8_t *pMessage, size_t nMessage);
+    void doDlrqResetMode(const uint8_t *pMessage, size_t nMessage);
+    void doDlrqRejoin(const uint8_t *pMessage);
+    void doDlrqGetVersion(const uint8_t *pMessage);
+    void sendDownlinkAck(void);
+    void receiveMessageDone(uint8_t port, const uint8_t *pMessage, size_t nMessage);
+
+    // Downlink pointer
+    static Arduino_LoRaWAN::ReceivePortBufferCbFn receiveMessage;
+
     // telemetry handling.
     // void fillTxBuffer(TxBuffer_t &b, Measurement const & mData);
     void startTransmission(TxBuffer_t &b);
@@ -486,9 +528,12 @@ private:
     bool                            m_fDatalimit: 1;
     // set true when Version is sent Over the Air
     bool                            m_fVersionOta: 1;
+    // set true if Downlink Acknowledgement is present
+    bool                            m_fRxAck : 1;
 
     // catena board flash parameters
     std::uint8_t                    m_boardRev;
+    std::uint16_t                   m_board;
 
     // PIR sample control
     cPIRdigital                     m_pir;
@@ -533,6 +578,7 @@ private:
     // the data to write to the file
     Measurement                     m_FileData;
     TxBuffer_t                      m_FileTxBuffer;
+    TxBuffer_t                      m_AckTxBuffer;
     };
 
 } // namespace McciCatena4430
