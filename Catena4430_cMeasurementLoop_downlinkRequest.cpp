@@ -91,31 +91,6 @@ void cMeasurementLoop::receiveMessageDone(
         return;
         }
 
-void cMeasurementLoop::doDlrqCalibCO2(
-    const uint8_t *pMessage,
-    size_t nMessage)
-    {
-    uint16_t co2Calib;
-
-    if (! (nMessage == 2))
-        {
-        gCatena.SafePrintf("invalid length(%x)\n",
-            nMessage
-            );
-        return;
-        }
-
-    co2Calib = (pMessage[0] << 8) | pMessage[1];
-
-    if (this->m_fScd30)
-        if (this->m_Scd.setForcedRecalibrationValue(co2Calib))
-            gCatena.SafePrintf("SCD30 is being calibrated to %u ppm successfully\n", co2Calib);
-        else
-            gCatena.SafePrintf("SCD30 calibration is failed\n");
-    else
-        gCatena.SafePrintf("SCD30 is not connected\n");
-    }
-
     this->m_AckTxBuffer.begin();
 
     switch (pMessage[0])
@@ -141,6 +116,31 @@ void cMeasurementLoop::doDlrqCalibCO2(
                 nMessage
                 );
         }
+    }
+
+void cMeasurementLoop::doDlrqCalibCO2(
+    const uint8_t *pMessage,
+    size_t nMessage)
+    {
+    uint16_t co2Calib;
+
+    if (! (nMessage == 2))
+        {
+        gCatena.SafePrintf("invalid length(%x)\n",
+            nMessage
+            );
+        return;
+        }
+
+    co2Calib = (pMessage[0] << 8) | pMessage[1];
+
+    if (this->m_fScd30)
+        if (this->m_Scd.setForcedRecalibrationValue(co2Calib))
+            gCatena.SafePrintf("SCD30 is being calibrated to %u ppm successfully\n", co2Calib);
+        else
+            gCatena.SafePrintf("SCD30 calibration is failed\n");
+    else
+        gCatena.SafePrintf("SCD30 is not connected\n");
     }
 
 void cMeasurementLoop::doDlrqResetAppEUI(
