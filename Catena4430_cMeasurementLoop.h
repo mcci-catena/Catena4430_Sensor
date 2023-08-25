@@ -142,7 +142,7 @@ public:
     static constexpr std::uint8_t kMajor = 2;
     static constexpr std::uint8_t kMinor = 2;
     static constexpr std::uint8_t kPatch = 0;
-    static constexpr std::uint8_t kLocal = 2;
+    static constexpr std::uint8_t kLocal = 0;
 
     // some parameters
     static constexpr std::uint8_t kUplinkPortDefault = 2;
