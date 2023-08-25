@@ -43,7 +43,7 @@ static_assert(
     "This sketch requires Catena-Arduino-Platform v0.21.0-5 or later"
     );
 
-constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(2,2,0,1);
+constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(2,2,0,2);
 constexpr std::uint32_t kDoubleResetWaitMs = 3000;
 constexpr std::uint32_t kSetDoubleResetMagic = 0xCA44301;
 constexpr std::uint32_t kClearDoubleResetMagic = 0xCA44300;
@@ -151,15 +151,6 @@ sMyExtraCommands_top(
 void setup()
     {
     setup_double_reset();
-
-    /* // allocate the buffer for cMeasurementLoop.
-    constexpr auto alignData = alignof(cMeasurementLoop);
-    constexpr size_t bufSize = sizeof(cMeasurementLoop);
-    static alignas(alignData) uint8_t buf[bufSize];
-
-    // initialize a measurement loop object, using the buffer
-    // as the underlying memory. This runs the constructors.
-    gpMeasurementLoopConcrete = new(buf) cMeasurementLoop(); */
 
     setup_version();
 
@@ -336,6 +327,7 @@ bool flashParam()
         }
 
     gpMeasurementLoopConcrete->setBoardRev(gpMeasurementLoopConcrete->m_pBoard->getRev());
+    gpMeasurementLoopConcrete->setBoard(gpMeasurementLoopConcrete->m_pBoard->getModel());
     return true;
     }
 
@@ -472,7 +464,11 @@ void setup_version(void)
         printBoardInfo();
         }
 
+    auto board = gpMeasurementLoopConcrete->readBoard();
+    auto boardRev = gpMeasurementLoopConcrete->readBoardRev();
     gpMeasurementLoopConcrete = gpMeasurementLoopConcrete->constructInstanceForHardware(isVersion2());
+    gpMeasurementLoopConcrete->setBoardRev(boardRev);
+    gpMeasurementLoopConcrete->setBoard(board);
     }
 
 void setup_download()

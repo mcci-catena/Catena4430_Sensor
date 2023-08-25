@@ -77,13 +77,44 @@ void cMeasurementLoop::receiveMessageDone(
         return;
         }
 
-    else if (! (port == 3))
+    else if (! (port == 2 || port == 3))
         {
         gCatena.SafePrintf("invalid message port(%02x)\n",
             port, nMessage
             );
         return;
         }
+
+    if (port == 2)
+        {
+        this->doDlrqCalibCO2(pMessage, nMessage);
+        return;
+        }
+
+void cMeasurementLoop::doDlrqCalibCO2(
+    const uint8_t *pMessage,
+    size_t nMessage)
+    {
+    uint16_t co2Calib;
+
+    if (! (nMessage == 2))
+        {
+        gCatena.SafePrintf("invalid length(%x)\n",
+            nMessage
+            );
+        return;
+        }
+
+    co2Calib = (pMessage[0] << 8) | pMessage[1];
+
+    if (this->m_fScd30)
+        if (this->m_Scd.setForcedRecalibrationValue(co2Calib))
+            gCatena.SafePrintf("SCD30 is being calibrated to %u ppm successfully\n", co2Calib);
+        else
+            gCatena.SafePrintf("SCD30 calibration is failed\n");
+    else
+        gCatena.SafePrintf("SCD30 is not connected\n");
+    }
 
     this->m_AckTxBuffer.begin();
 
@@ -222,12 +253,15 @@ void cMeasurementLoop::doDlrqGetVersion(
     this->m_AckTxBuffer.put(this->kMinor);
     this->m_AckTxBuffer.put(this->kPatch);
     this->m_AckTxBuffer.put(this->kLocal);
-    this->m_AckTxBuffer.put2u(this->m_board);
-    this->m_AckTxBuffer.put(this->m_boardRev);
+    this->m_AckTxBuffer.put2u(this->readBoard());
+    this->m_AckTxBuffer.put(this->readBoardRev());
 
     this->m_fRxAck = true;
     gCatena.SafePrintf("SW Version: v%u.%u.%u.%u\n", this->kMajor, this->kMinor, this->kPatch, this->kLocal);
-    gCatena.SafePrintf("HW Details:\n\tBoard: %u\n\tRev: %u\n", this->m_board, this->m_boardRev);
+    gCatena.SafePrintf("HW Details:\n\tBoard: %u\n\tRev: %u\n",
+            this->readBoard(),
+            this->readBoardRev()
+            );
     }
 
 void cMeasurementLoop::sendDownlinkAck(void)

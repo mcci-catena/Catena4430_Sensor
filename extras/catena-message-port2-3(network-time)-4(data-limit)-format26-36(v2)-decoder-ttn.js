@@ -345,6 +345,14 @@ function DecodeDownlinkResponse(bytes) {
                 decoded.Rev = "B";
             else if (Rev === 2)
                 decoded.Rev = "C";
+            else if (Rev === 3)
+                decoded.Rev = "D";
+            else if (Rev === 4)
+                decoded.Rev = "E";
+            else if (Rev === 5)
+                decoded.Rev = "F";
+            else if (Rev === 6)
+                decoded.Rev = "G";
             }
         else if (Model === 0)
             {

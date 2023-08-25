@@ -257,6 +257,11 @@ cMeasurementLoop::fsmDispatch(
                 gCatena.poll();
                 yield();
                 }
+            if (this->m_fRxAck)
+                {
+                this->sendDownlinkAck();
+                this->m_fRxAck = false;
+                }
             }
         if (! gLoRaWAN.IsProvisioned())
             {

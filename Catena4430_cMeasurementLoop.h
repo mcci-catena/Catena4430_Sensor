@@ -142,7 +142,7 @@ public:
     static constexpr std::uint8_t kMajor = 2;
     static constexpr std::uint8_t kMinor = 2;
     static constexpr std::uint8_t kPatch = 0;
-    static constexpr std::uint8_t kLocal = 1;
+    static constexpr std::uint8_t kLocal = 2;
 
     // some parameters
     static constexpr std::uint8_t kUplinkPortDefault = 2;
@@ -336,7 +336,7 @@ public:
         // set the board model.
         this->m_board = board;
         }
-    uint8_t readBoard()
+    uint16_t readBoard()
         {
         // return the board model.
         return this->m_board;
@@ -430,7 +430,7 @@ private:
     void measureActivity();
 
     // downlink requests
-    void doDlrqResetInterval(const uint8_t *pMessage, size_t nMessage);
+    void doDlrqCalibCO2(const uint8_t *pMessage, size_t nMessage);
     void doDlrqResetAppEUI(const uint8_t *pMessage, size_t nMessage);
     void doDlrqResetAppKey(const uint8_t *pMessage, size_t nMessage);
     void doDlrqResetMode(const uint8_t *pMessage, size_t nMessage);

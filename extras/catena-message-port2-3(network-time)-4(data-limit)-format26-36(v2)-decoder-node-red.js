@@ -348,7 +348,7 @@ function DecodeDownlinkResponse(bytes) {
             }
         else if (Model === 0)
             {
-            decoded.Model = 4917;
+            decoded.Model = 4610;
             decoded.Rev = "Not Found";
             }
         }
