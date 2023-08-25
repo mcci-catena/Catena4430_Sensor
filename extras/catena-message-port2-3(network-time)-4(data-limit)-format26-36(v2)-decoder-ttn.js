@@ -298,6 +298,128 @@ function DecodeV(Parse) {
     return DecodeI16(Parse) / 4096.0;
 }
 
+function DecodeDownlinkResponse(bytes) {
+    // Decode an uplink message from a buffer
+    // (array) of bytes to an object of fields.
+    var decoded = {};
+
+    // an object to help us parse.
+    var Parse = {};
+    Parse.bytes = bytes;
+    // i is used as the index into the message. Start with the flag byte.
+    Parse.i = 0;
+
+    // fetch the bitmap.
+    var command = bytes[Parse.i++];
+
+    if (command === 0x02) {
+        // Reset do not send a reply back.
+    }
+
+    else if (command === 0x03) {
+        // SW version and HW details.
+        decoded.ResponseType = "Device Version";
+
+        var responseError = bytes[Parse.i++];
+        if (responseError === 0)
+            decoded.ResponseError = "Success";
+        else if (responseError === 1)
+            decoded.ResponseError = "Invalid Length";
+        else if (responseError === 2)
+            decoded.ResponseError = "Failure";
+
+        var vMajor = bytes[Parse.i++];
+        var vMinor = bytes[Parse.i++];
+        var vPatch = bytes[Parse.i++];
+        var vLocal = bytes[Parse.i++];
+        decoded.AppVersion = "V" + vMajor + "." + vMinor + "." + vPatch + "." + vLocal;
+
+        var Model = DecodeU16(Parse);
+        var Rev = bytes[Parse.i++];
+        if (!(Model === 0))
+            {
+            decoded.Model = Model;
+            if (Rev === 0)
+                decoded.Rev = "A";
+            else if (Rev === 1)
+                decoded.Rev = "B";
+            else if (Rev === 2)
+                decoded.Rev = "C";
+            else if (Rev === 3)
+                decoded.Rev = "D";
+            else if (Rev === 4)
+                decoded.Rev = "E";
+            else if (Rev === 5)
+                decoded.Rev = "F";
+            else if (Rev === 6)
+                decoded.Rev = "G";
+            }
+        else if (Model === 0)
+            {
+            decoded.Model = 4917;
+            decoded.Rev = "Not Found";
+            }
+        }
+
+    else if (command === 0x04) {
+        // Reset/Set AppEUI.
+        decoded.ResponseType = "AppEUI Set";
+
+        var responseError = bytes[Parse.i++];
+        if (responseError === 0)
+            decoded.ResponseError = "Success";
+        else if (responseError === 1)
+            decoded.ResponseError = "Invalid Length";
+        else if (responseError === 2)
+            decoded.ResponseError = "Failure";
+    }
+
+    else if (command === 0x05) {
+        // Reset/Set AppKey.
+        decoded.ResponseType = "AppKey set";
+
+        var responseError = bytes[Parse.i++];
+        if (responseError === 0)
+            decoded.ResponseError = "Success";
+        else if (responseError === 1)
+            decoded.ResponseError = "Invalid Length";
+        else if (responseError === 2)
+            decoded.ResponseError = "Failure";
+    }
+
+    else if (command === 0x06) {
+        // Rejoin the network.
+        decoded.ResponseType = "Rejoin";
+
+        var responseError = bytes[Parse.i++];
+        if (responseError === 0)
+            decoded.ResponseError = "Success";
+        else if (responseError === 1)
+            decoded.ResponseError = "Invalid Length";
+        else if (responseError === 2)
+            decoded.ResponseError = "Failure";
+    }
+
+    else if (command === 0x07) {
+        // Uplink Interval for sensor data.
+        decoded.ResponseType = "Uplink Interval";
+
+        var responseError = bytes[Parse.i++];
+        if (responseError === 0)
+            decoded.ResponseError = "Success";
+        else if (responseError === 1)
+            decoded.ResponseError = "Invalid Length";
+        else if (responseError === 2)
+            decoded.ResponseError = "Failure";
+
+        decoded.UplinkInterval = DecodeU32(Parse);
+    }
+    else
+        return null;
+
+    return decoded;
+}
+
 function Decoder(bytes, port) {
     // Decode an uplink message from a buffer
     // (array) of bytes to an object of fields.
@@ -307,7 +429,12 @@ function Decoder(bytes, port) {
         return null;
 
     var uFormat = bytes[0];
-    if (! (uFormat === 0x26) && ! (uFormat === 0x36))
+    if (! (uFormat === 0x26) && ! (uFormat === 0x36) && (port === 3))
+        {
+        decoded = DecodeDownlinkResponse(bytes);
+        return decoded;
+        }
+    else if (! (uFormat === 0x26) && ! (uFormat === 0x36) && ! (port === 3))
         return null;
 
     // an object to help us parse.

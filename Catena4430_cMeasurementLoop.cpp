@@ -24,6 +24,7 @@ using namespace McciCatena4430;
 
 extern c4430Gpios gpio;
 extern cMeasurementLoop *gpMeasurementLoopConcrete;
+extern Catena::LoRaWAN gLoRaWAN;
 
 static constexpr uint8_t kVddPin = D11;
 
@@ -52,6 +53,7 @@ void cMeasurementLoop::begin()
         this->m_UplinkTimer.begin(this->m_txCycleSec * 1000);
         this->m_pirSampleTimer.begin(this->m_pirSampleSec * 1000);
         this->m_ActivityTimer.begin(this->m_ActivityTimerSec * 1000);
+        gLoRaWAN.SetReceiveBufferBufferCb(receiveMessage);
         }
 
     // start and initialize the PIR sensor
@@ -254,6 +256,11 @@ cMeasurementLoop::fsmDispatch(
 
                 gCatena.poll();
                 yield();
+                }
+            if (this->m_fRxAck)
+                {
+                this->sendDownlinkAck();
+                this->m_fRxAck = false;
                 }
             }
         if (! gLoRaWAN.IsProvisioned())
