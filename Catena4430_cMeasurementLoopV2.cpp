@@ -89,32 +89,37 @@ bool cMeasurementLoopV2::takeMeasurements(void)
                 {
                 this->m_fHardError = true;
                 if (gLog.isEnabled(gLog.DebugFlags::kError))
+                    {
                     gLog.printf(
                         gLog.kAlways,
                         "LTR329 queryReady failed: status %s(%u)\n",
                         this->m_Ltr.getLastErrorName(),
                         unsigned(this->m_Ltr.getLastError())
                         );
+
+                    this->m_Ltr.begin();
+                    }
                 }
             else
                 {
                 currentLux = this->m_Ltr.getLux();
 
+                if (currentLux <= kMax_Gain_96)
+                    this->m_Ltr.setGain(96);
+                else if (currentLux <= kMax_Gain_48)
+                    this->m_Ltr.setGain(48);
+                else if (currentLux <= kMax_Gain_8)
+                    this->m_Ltr.setGain(8);
+                else if (currentLux <= kMax_Gain_4)
+                    this->m_Ltr.setGain(4);
+                else if (currentLux <= kMax_Gain_2)
+                    this->m_Ltr.setGain(2);
+                else
+                    this->m_Ltr.setGain(1);
+
+                currentLux = this->m_Ltr.getLux();
                 this->m_data.flags |= FlagsV2::Light;
                 this->m_data.light.Lux = currentLux;
-
-                if (currentLux <= kMax_Gain_96)
-                    m_AlsCtrl.setGain(96);
-                else if (currentLux <= kMax_Gain_48)
-                    m_AlsCtrl.setGain(48);
-                else if (currentLux <= kMax_Gain_8)
-                    m_AlsCtrl.setGain(8);
-                else if (currentLux <= kMax_Gain_4)
-                    m_AlsCtrl.setGain(4);
-                else if (currentLux <= kMax_Gain_2)
-                    m_AlsCtrl.setGain(2);
-                else
-                    m_AlsCtrl.setGain(1);
 
                 if (currentLux <= 100)
                     gpMeasurementLoopConcrete->m_fLowLight = true;
