@@ -140,8 +140,8 @@ class cMeasurementLoop : public McciCatena::cPollableObject
 public:
     // version parameters
     static constexpr std::uint8_t kMajor = 2;
-    static constexpr std::uint8_t kMinor = 2;
-    static constexpr std::uint8_t kPatch = 1;
+    static constexpr std::uint8_t kMinor = 3;
+    static constexpr std::uint8_t kPatch = 0;
     static constexpr std::uint8_t kLocal = 0;
 
     // some parameters
@@ -231,6 +231,7 @@ public:
         stWriteFile,    // write file data
         stTryToUpdate,  // try to update firmware
         stTryToMigrate, // try to migrate device to TTN V3
+        stTryToRejoin,  // try to rejoin to lorawan network
         stAwaitCard,    // wait for a card to show up.
         stRebootForUpdate, // reboot system to complete firmware update
 
@@ -251,6 +252,7 @@ public:
         case State::stWriteFile: return "stWriteFile";
         case State::stTryToUpdate: return "stTryToUpdate";
         case State::stTryToMigrate: return "stTryToMigrate";
+        case State::stTryToRejoin: return "stTryToRejoin";
         case State::stAwaitCard: return "stAwaitCard";
         case State::stRebootForUpdate: return "stRebootForUpdate";
         case State::stFinal:    return "stFinal";
@@ -464,6 +466,7 @@ private:
     bool handleSdFirmwareUpdateCardUp();
     bool updateFromSd(const char *sFile, McciCatena::cDownload::DownloadRq_t rq);
     void handleSdTTNv3Migrate();
+    void handleSdNetworkRejoin();
     void rejoinNetwork();
     void sdPowerUp(bool fOn);
     void sdPrep();
@@ -584,3 +587,4 @@ private:
 } // namespace McciCatena4430
 
 #endif /* _Catena4430_cMeasurementLoop_h_ */
+

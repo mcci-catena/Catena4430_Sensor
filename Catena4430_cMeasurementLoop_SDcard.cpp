@@ -40,6 +40,7 @@ SDClass gSD;
 extern cMeasurementLoop *gpMeasurementLoopConcrete;
 
 constexpr char gkMigrateFileName[] = "MIGRATE.V3";
+constexpr char gkRejoinFileName[] = "REJOIN.NW";
 
 /****************************************************************************\
 |
@@ -656,6 +657,30 @@ cMeasurementLoop::handleSdTTNv3Migrate(
     }
 
 void
+cMeasurementLoop::handleSdNetworkRejoin(
+    void
+    )
+    {
+    bool fRejoin = false;
+    bool fResult = this->checkSdCard();
+
+	if (fResult)
+        {
+        if (! gSD.exists(gkRejoinFileName))
+            fRejoin = false;
+        else
+            fRejoin = true;
+        }
+
+    if (fRejoin)
+        {
+        this->rejoinNetwork();
+        gSD.remove(gkRejoinFileName);
+        }
+    this->sdFinish();
+    }
+
+void
 cMeasurementLoop::rejoinNetwork(
     void
     )
@@ -667,3 +692,4 @@ cMeasurementLoop::rejoinNetwork(
     }
 
 #undef FUNCTION
+
