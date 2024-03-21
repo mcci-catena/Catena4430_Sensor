@@ -274,6 +274,7 @@ void cMeasurementLoopV1::writeVersionData(File dataFile)
     if ((m_data.flags & FlagsV1::Light) != FlagsV1(0))
         {
         dataFile.print(m_data.light.White);
+        dataFile.print(',');
         }
     else
         {
