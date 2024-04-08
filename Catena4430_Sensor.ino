@@ -129,6 +129,7 @@ static const cCommandStream::cEntry sMyExtraCommmands[] =
         { "tree", cmdDir },
         { "info", cmdInfo },
         { "interval", cmdInterval },
+        { "hang", cmdHang },
         // other commands go here....
         };
 
@@ -164,6 +165,7 @@ void setup()
     setup_gpio();
     setup_rtc();
     setup_commands();
+    setup_watchdog();
     setup_start();
     }
 
@@ -411,6 +413,7 @@ void setup_rtc()
             uint8_t nBlink = 0;
             while (nBlink < 5)
                 {
+                gpMeasurementLoopConcrete->refreshWatchdog();
                 gpio.setRed(true);
                 delay(100);
                 gpio.setRed(false);
@@ -503,6 +506,11 @@ void setup_commands()
         );
     }
 
+void setup_watchdog()
+    {
+    gpMeasurementLoopConcrete->setupWatchdog();
+    }
+
 void setup_start()
     {
     gpMeasurementLoopConcrete->requestActive(true);
@@ -516,6 +524,7 @@ void setup_start()
 
 void loop()
     {
+    gpMeasurementLoopConcrete->refreshWatchdog();
     gCatena.poll();
 
     if (gpMeasurementLoopConcrete->fDisableLED)
