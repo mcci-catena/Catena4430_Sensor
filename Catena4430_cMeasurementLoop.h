@@ -140,8 +140,8 @@ class cMeasurementLoop : public McciCatena::cPollableObject
 public:
     // version parameters
     static constexpr std::uint8_t kMajor = 2;
-    static constexpr std::uint8_t kMinor = 3;
-    static constexpr std::uint8_t kPatch = 1;
+    static constexpr std::uint8_t kMinor = 4;
+    static constexpr std::uint8_t kPatch = 0;
     static constexpr std::uint8_t kLocal = 0;
 
     // some parameters
@@ -157,6 +157,9 @@ public:
     static constexpr std::uint8_t kSdCardCSpin = D5;
     using Flash_t = McciCatena::FlashParamsStm32L0_t;
     using ParamBoard_t = Flash_t::ParamBoard_t;
+    static constexpr std::uint32_t kNumSecondsFitfulSleepMax = 10;
+    static constexpr std::uint32_t kWatchdogSeconds = 26;
+    static_assert(kNumSecondsFitfulSleepMax < kWatchdogSeconds, "Wake up often enough to refresh the IWDG watchdog");
 
     void deepSleepPrepare();
     void deepSleepRecovery();
@@ -409,6 +412,15 @@ public:
     /// tear down the SD card.
     void sdFinish();
 
+    /// @brief setup STM32Lxx IWDG to require 20 second updates.
+    void setupWatchdog();
+    /// @brief get another 20 seconds before the watchdog triggers
+    void refreshWatchdog();
+
+    /// @brief delay for a while, and refresh the watchdog.
+    /// @param millis number of milliseconds, as for \c ::delay().
+    void safeDelay(uint32_t millis);
+
     // timeout handling
 
     // set the timer
@@ -424,6 +436,7 @@ private:
     bool checkDeepSleep();
     void doSleepAlert(bool fDeepSleep);
     void doDeepSleep();
+    void fitfulSleep(uint32_t nSeconds);
 
     // read data
     void updateSynchronousMeasurements();

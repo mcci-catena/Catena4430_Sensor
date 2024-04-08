@@ -25,5 +25,6 @@ McciCatena::cCommandStream::CommandFn cmdInfo;
 McciCatena::cCommandStream::CommandFn cmdDate;
 McciCatena::cCommandStream::CommandFn cmdLog;
 McciCatena::cCommandStream::CommandFn cmdDir;
+McciCatena::cCommandStream::CommandFn cmdHang;
 
 #endif /* _Catena4430_cmd_h_ */
