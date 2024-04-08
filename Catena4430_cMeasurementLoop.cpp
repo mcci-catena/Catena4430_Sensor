@@ -319,6 +319,15 @@ cMeasurementLoop::fsmDispatch(
             {
             this->handleSdTTNv3Migrate();
             }
+        newState = State::stTryToRejoin;
+        break;
+
+    // try to rejoin to network
+    case State::stTryToRejoin:
+        if (fEntry)
+            {
+            this->handleSdNetworkRejoin();
+            }
         newState = State::stSleeping;
         break;
 
@@ -1143,3 +1152,4 @@ bool cMeasurementLoop::timedOut()
     this->m_fTimerEvent = false;
     return result;
     }
+

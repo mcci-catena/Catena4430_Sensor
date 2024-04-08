@@ -304,6 +304,7 @@ void cMeasurementLoopV2::writeVersionData(File dataFile)
     if ((m_data.flags & FlagsV2::Light) != FlagsV2(0))
         {
         dataFile.print(m_data.light.Lux);
+        dataFile.print(',');
         }
     else
         {
