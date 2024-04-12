@@ -541,6 +541,8 @@ cMeasurementLoop::updateFromSd(
             context_t * const pCtx = (context_t *)pUserData;
 
             gLog.printf(gLog.kInfo, ".");
+
+            gpMeasurementLoopConcrete->refreshWatchdog();
             gCatena.poll();
 
             auto n = pCtx->firmwareFile.readBytes(pBuffer, nBuffer);
@@ -587,15 +589,21 @@ cMeasurementLoop::updateFromSd(
 
     // it launched: wait for transfer to complete
     while (context.fWorking)
+        {
+        gpMeasurementLoopConcrete->refreshWatchdog();
         // give other clients a chance to look in.
         // and allow the download to be coded asynchronously
         // if necessary.
         gCatena.poll();
+        }
 
     // download operation is complete.
     // close and remove the file
+    gpMeasurementLoopConcrete->refreshWatchdog();
     context.firmwareFile.close();
+    gpMeasurementLoopConcrete->refreshWatchdog();
     gSD.remove(sUpdate);
+    gpMeasurementLoopConcrete->refreshWatchdog();
 
     // if it failed, display the error code.
     if (context.status != cDownload::Status_t::kSuccessful)
