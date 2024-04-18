@@ -81,7 +81,7 @@ bool cMeasurementLoopV2::takeMeasurements(void)
 
             while (! this->m_Ltr.queryReady(fHardError))
                 {
-                this->refreshWatchdog();
+                gIwdgTimer.refreshWatchdog();
                 if (fHardError)
                     break;
                 }

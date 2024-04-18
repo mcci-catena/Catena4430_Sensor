@@ -136,7 +136,7 @@ cMeasurementLoop::fsmDispatch(
     bool fEntry
     )
     {
-    this->refreshWatchdog();
+    gIwdgTimer.refreshWatchdog();
     State newState = State::stNoChange;
 
     if (fEntry && this->isTraceEnabled(this->DebugFlags::kTrace))
@@ -245,7 +245,7 @@ cMeasurementLoop::fsmDispatch(
             while (true)
                 {
                 std::uint32_t lmicCheckTime;
-                this->refreshWatchdog();
+                gIwdgTimer.refreshWatchdog();
                 os_runloop_once();
                 lmicCheckTime = this->m_UplinkTimer.getRemaining();
 
@@ -342,15 +342,15 @@ cMeasurementLoop::fsmDispatch(
                 uint8_t nBlink = 0;
                 while (nBlink < 5)
                     {
-                    this->refreshWatchdog();
+                    gIwdgTimer.refreshWatchdog();
                     gpio.setBlue(true);
-                    safeDelay(100);
+                    gIwdgTimer.safeDelay(100);
                     gpio.setBlue(false);
-                    safeDelay(100);
+                    gIwdgTimer.safeDelay(100);
                     gpio.setBlue(true);
-                    safeDelay(100);
+                    gIwdgTimer.safeDelay(100);
                     gpio.setBlue(false);
-                    safeDelay(500);
+                    gIwdgTimer.safeDelay(500);
                     nBlink += 1;
                     }
                 }
@@ -393,13 +393,6 @@ void cMeasurementLoop::resetMeasurements()
     {
     memset((void *) &this->m_data, 0, sizeof(this->m_data));
     gpMeasurementLoopConcrete->clearMeasurements();
-    }
-
-void cMeasurementLoop::safeDelay(uint32_t millis)
-    {
-    this->refreshWatchdog();
-    delay(millis);
-    this->refreshWatchdog();
     }
 
 void cMeasurementLoop::updateScd30Measurements()
@@ -1025,7 +1018,7 @@ void cMeasurementLoop::doSleepAlert(bool fDeepSleep)
 
             while (uint32_t(millis() - tNow) < 1000)
                 {
-                this->refreshWatchdog();
+                gIwdgTimer.refreshWatchdog();
                 gCatena.poll();
                 yield();
                 }
@@ -1035,7 +1028,7 @@ void cMeasurementLoop::doSleepAlert(bool fDeepSleep)
         uint32_t tNow = millis();
         while (uint32_t(millis() - tNow) < 100)
             {
-            this->refreshWatchdog();
+            gIwdgTimer.refreshWatchdog();
             gCatena.poll();
             yield();
             }
@@ -1081,54 +1074,8 @@ void cMeasurementLoop::fitfulSleep(uint32_t seconds)
         gCatena.Sleep(nSecondsThisTime);
         seconds -= nSecondsThisTime;
 
-        this->refreshWatchdog();
+        gIwdgTimer.refreshWatchdog();
         }
-    }
-
-#define FUNCTION "cMeasurementLoop::setupWatchdog"
-
-void cMeasurementLoop::setupWatchdog()
-    {
-    constexpr uint32_t IWDG_KEY_ENABLE = 0xCCCC;
-    constexpr uint32_t IWDG_KEY_WRITE_ACCESS_ENABLE = 0x5555;
-    constexpr uint32_t IWDG_KEY_WRITE_ACCESS_DISABLE = 0;
-
-    // compute number of ticks to set in the reload register.
-    // 40000 is the rough RC frequency of the watchdog, 256 is the pre-scaler.
-    constexpr uint32_t knTicks = (this->kWatchdogSeconds * 40000) / 256;
-    static_assert(knTicks <= 0xFFF, "knTicks must fit in a 12-bit field");
-
-    // enable the IWDG
-    IWDG->KR = IWDG_KEY_ENABLE;
-    // allow write access.
-    IWDG->KR = IWDG_KEY_WRITE_ACCESS_ENABLE;
-    // set prescaler to 7, i.e., divide by 256. So one tick == 40000 Hz/256 == 156.25 Hz == 6.4ms
-    IWDG->PR = 7;
-    // set reload register.
-    IWDG->RLR = knTicks;
-    // wait for the register to update. Since we're initializing, we don't
-    // really care very much.
-    for (uint32_t tNow = millis(); millis() - tNow < 48;)
-        {
-        if (IWDG->SR == 0)
-            break;
-        }
-    if (IWDG->SR != 0)
-        {
-        gCatena.SafePrintf("?" FUNCTION ": watchdog setup failed!: %x\n", IWDG->SR);
-        }
-
-    // refresh the watchdog
-    this->refreshWatchdog();
-    }
-
-#undef FUNCTION
-
-void cMeasurementLoop::refreshWatchdog()
-    {
-    constexpr uint32_t IWDG_KEY_REFRESH = 0xAAAA;
-
-    IWDG->KR = IWDG_KEY_REFRESH;
     }
 
 //

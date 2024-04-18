@@ -29,6 +29,7 @@ Author:
 #include "Catena4430_cmd.h"
 #include <Catena4430_cClockDriver_PCF8523.h>
 #include <MCCI_Catena_SCD30.h>
+#include <Catena_WatchdogTimer.h>
 
 extern McciCatena::Catena gCatena;
 using namespace McciCatena4430;
@@ -413,7 +414,7 @@ void setup_rtc()
             uint8_t nBlink = 0;
             while (nBlink < 5)
                 {
-                gpMeasurementLoopConcrete->refreshWatchdog();
+                gIwdgTimer.refreshWatchdog();
                 gpio.setRed(true);
                 delay(100);
                 gpio.setRed(false);
@@ -508,7 +509,7 @@ void setup_commands()
 
 void setup_watchdog()
     {
-    gpMeasurementLoopConcrete->setupWatchdog();
+    gIwdgTimer.setupWatchdog();
     }
 
 void setup_start()
@@ -524,7 +525,7 @@ void setup_start()
 
 void loop()
     {
-    gpMeasurementLoopConcrete->refreshWatchdog();
+    gIwdgTimer.refreshWatchdog();
     gCatena.poll();
 
     if (gpMeasurementLoopConcrete->fDisableLED)
