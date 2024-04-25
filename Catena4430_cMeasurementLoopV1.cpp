@@ -78,7 +78,7 @@ bool cMeasurementLoopV1::takeMeasurements(void)
 
     while (fSi1133Data)
         {
-        this->refreshWatchdog();
+        gIwdgTimer.refreshWatchdog();
         if (this->m_si1133.isOneTimeReady())
             {
             fSi1133Data = false;

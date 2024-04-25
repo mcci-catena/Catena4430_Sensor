@@ -41,6 +41,7 @@ Author:
 #include "Catena4430_cPelletFeeder.h"
 #include "Catena4430_cPIRdigital.h"
 #include <Catena_Date.h>
+#include <Catena_WatchdogTimer.h>
 
 #include <cstdint>
 
@@ -141,7 +142,7 @@ public:
     // version parameters
     static constexpr std::uint8_t kMajor = 2;
     static constexpr std::uint8_t kMinor = 4;
-    static constexpr std::uint8_t kPatch = 0;
+    static constexpr std::uint8_t kPatch = 2;
     static constexpr std::uint8_t kLocal = 0;
 
     // some parameters
@@ -158,8 +159,8 @@ public:
     using Flash_t = McciCatena::FlashParamsStm32L0_t;
     using ParamBoard_t = Flash_t::ParamBoard_t;
     static constexpr std::uint32_t kNumSecondsFitfulSleepMax = 10;
-    static constexpr std::uint32_t kWatchdogSeconds = 26;
-    static_assert(kNumSecondsFitfulSleepMax < kWatchdogSeconds, "Wake up often enough to refresh the IWDG watchdog");
+    static constexpr std::uint32_t kWatchdogTimerSeconds = McciCatena::cWatchdogTimer::kWatchdogSeconds;  // kWatchdogSeconds: 26 seconds
+    static_assert(kNumSecondsFitfulSleepMax < kWatchdogTimerSeconds, "Wake up often enough to refresh the IWDG watchdog");
 
     void deepSleepPrepare();
     void deepSleepRecovery();
@@ -411,15 +412,6 @@ public:
     bool checkSdCard();
     /// tear down the SD card.
     void sdFinish();
-
-    /// @brief setup STM32Lxx IWDG to require 20 second updates.
-    void setupWatchdog();
-    /// @brief get another 20 seconds before the watchdog triggers
-    void refreshWatchdog();
-
-    /// @brief delay for a while, and refresh the watchdog.
-    /// @param millis number of milliseconds, as for \c ::delay().
-    void safeDelay(uint32_t millis);
 
     // timeout handling
 
