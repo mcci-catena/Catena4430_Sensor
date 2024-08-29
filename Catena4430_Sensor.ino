@@ -44,9 +44,11 @@ static_assert(
     "This sketch requires Catena-Arduino-Platform v0.21.0-5 or later"
     );
 
-constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(2,4,2,0);
+constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(2,5,0,1);
 constexpr std::uint32_t kDoubleResetWaitMs = 3000;
+constexpr std::uint32_t kTripleResetWaitMs = 4000;
 constexpr std::uint32_t kSetDoubleResetMagic = 0xCA44301;
+constexpr std::uint32_t kSetTripleResetMagic = 0xCA44302;
 constexpr std::uint32_t kClearDoubleResetMagic = 0xCA44300;
 
 /****************************************************************************\
@@ -114,6 +116,7 @@ bool fAnalogPin2;
 bool fCheckPinA1;
 bool fCheckPinA2;
 bool fToggle;
+bool gfRejoin;
 
 /****************************************************************************\
 |
@@ -175,8 +178,18 @@ void setup_double_reset()
     const uint32_t resetReason = READ_REG(RCC->CSR);
     if (resetReason & RCC_CSR_PINRSTF)
         {
-        if (RTC->BKP0R == kSetDoubleResetMagic)
+        if (RTC->BKP0R == kSetTripleResetMagic)
             {
+            gfRejoin = true;
+            RTC->BKP0R = kClearDoubleResetMagic;
+            }
+        else if (RTC->BKP0R == kSetDoubleResetMagic)
+            {
+            RTC->BKP0R = kSetTripleResetMagic;
+            pinMode(D13, OUTPUT);
+            digitalWrite(D13, HIGH);
+            delay(kTripleResetWaitMs);
+            digitalWrite(D13, LOW);
             fToggle = true;
             RTC->BKP0R = kClearDoubleResetMagic;
             }
@@ -485,6 +498,8 @@ void setup_radio()
     gLoRaWAN.begin(&gCatena);
     gCatena.registerObject(&gLoRaWAN);
     LMIC_setClockError(10 * MAX_CLOCK_ERROR / 100);
+    if (gfRejoin)
+        LMIC_unjoinAndRejoin();
     }
 
 void setup_measurement()
