@@ -142,7 +142,7 @@ public:
     // version parameters
     static constexpr std::uint8_t kMajor = 2;
     static constexpr std::uint8_t kMinor = 5;
-    static constexpr std::uint8_t kPatch = 0;
+    static constexpr std::uint8_t kPatch = 1;
     static constexpr std::uint8_t kLocal = 0;
 
     // some parameters
