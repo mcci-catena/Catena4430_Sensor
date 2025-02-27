@@ -142,13 +142,16 @@ public:
     // version parameters
     static constexpr std::uint8_t kMajor = 2;
     static constexpr std::uint8_t kMinor = 5;
-    static constexpr std::uint8_t kPatch = 1;
-    static constexpr std::uint8_t kLocal = 0;
+    static constexpr std::uint8_t kPatch = 2;
+    static constexpr std::uint8_t kLocal = 1;
 
     // some parameters
     static constexpr std::uint8_t kUplinkPortDefault = 2;
     static constexpr std::uint8_t kUplinkPortwithNwTime = 3;
     static constexpr std::uint8_t kUplinkPortDataLimit = 4;
+    static constexpr std::uint8_t kDownlinkPortIntervalChange = 1;
+    static constexpr std::uint8_t kDownlinkPortCo2Change = 2;
+    static constexpr std::uint8_t kDownlinkPort = 3;
     static constexpr bool kEnableDeepSleep = false;
     static constexpr unsigned kMaxActivityEntries = 8;
     using MeasurementFormat = cMeasurementFormat<kMaxActivityEntries>;
@@ -172,7 +175,8 @@ public:
         dlrqGetVersion,
         dlrqResetAppEUI,
         dlrqResetAppKey,
-        dlrqRejoin
+        dlrqRejoin,
+        dlrqGetUplinkInterval
         };
 
     // downlink error codes
@@ -180,7 +184,9 @@ public:
         {
         kSuccess = 0,
         kInvalidLength,
-        kNotSuccess
+        kNotSuccess,
+        kInvalidRange,
+        kNotConnected
         };
 
     enum OPERATING_FLAGS : uint32_t
@@ -215,6 +221,9 @@ public:
         , m_ActivityTimerSec(60)            // the activity time sample interval
         , m_ActivityDataLimitTimerSec(9 * 60)    // the time sample interval to limit data
         , m_txCycleSec_Low_Power(60 * 60)   // uplink interval when Vbat < 3.2V
+        , m_txMinimum(10)                   // minimum tx interval
+        , m_txMaximum(m_txCycleSec_Permanent < 60 * 60 * 8 ? 60 * 60 * 8 : m_txCycleSec_Permanent) // maximum tx interval
+        , m_intervalCount(30)               // interval count of downlinks
         {};
 
     // neither copyable nor movable
@@ -270,6 +279,7 @@ public:
 
     // Uplink port
     std::uint8_t uplinkPort;
+    std::uint8_t downlinkPort;
 
     // flag to disable LED
     bool fDisableLED;
@@ -357,6 +367,17 @@ public:
         std::uint32_t txCycleCount
         )
         {
+        if (txCycleCount > 0)
+            gCatena.SafePrintf(
+                "message cycle time %u seconds for %u messages\n",
+                txCycleSec, txCycleCount
+                );
+        else
+            gCatena.SafePrintf(
+                "message cycle time %u seconds indefinitely\n",
+                txCycleSec
+                );
+
         this->m_txCycleSec = txCycleSec;
         this->m_txCycleCount = txCycleCount;
 
@@ -437,12 +458,13 @@ private:
     void measureActivity();
 
     // downlink requests
+    void doDlrqChangeInterval(const uint8_t *pMessage, size_t nMessage);
     void doDlrqCalibCO2(const uint8_t *pMessage, size_t nMessage);
     void doDlrqResetAppEUI(const uint8_t *pMessage, size_t nMessage);
     void doDlrqResetAppKey(const uint8_t *pMessage, size_t nMessage);
-    void doDlrqResetMode(const uint8_t *pMessage, size_t nMessage);
     void doDlrqRejoin(const uint8_t *pMessage);
     void doDlrqGetVersion(const uint8_t *pMessage);
+    void doDlrqGetUplinkInterval(const uint8_t *pMessage);
     void sendDownlinkAck(void);
     void receiveMessageDone(uint8_t port, const uint8_t *pMessage, size_t nMessage);
 
@@ -567,6 +589,11 @@ private:
     std::uint32_t                   m_txCycleCount;
     std::uint32_t                   m_txCycleSec_Permanent;
     std::uint32_t                   m_txCycleSec_Low_Power;
+
+    // additional time parameter
+    std::uint32_t                   m_txMinimum;
+    std::uint32_t                   m_txMaximum;
+    std::uint32_t                   m_intervalCount;
 
     // RTC set time control
     std::uint32_t                   m_rtcSetSec;

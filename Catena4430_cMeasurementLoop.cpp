@@ -18,6 +18,8 @@ Author:
 #include <Catena4430.h>
 #include <arduino_lmic.h>
 #include <Catena4430_Sensor.h>
+#include <Catena.h>
+#include <Catena_Fram.h>
 
 using namespace McciCatena;
 using namespace McciCatena4430;
@@ -34,6 +36,8 @@ uint32_t HAL_AddTick(uint32_t delta);
 void user_request_network_time_cb(void *pVoidUserUTCTime, int flagSuccess);
 
 uint32_t timeOut = 200;
+
+auto const pFram = gCatena.getFram();
 
 /****************************************************************************\
 |
@@ -94,6 +98,19 @@ void cMeasurementLoop::begin()
 
     // clear flag for Data limit
     this->m_fDatalimit = false;
+
+    uint32_t framTxCycleSec;
+    pFram->getField(
+            cFramStorage::StandardKeys::kUplinkInterval,
+            framTxCycleSec
+            );
+
+    if (framTxCycleSec == 0 || framTxCycleSec > this->m_txMaximum)
+        pFram->saveField(
+                cFramStorage::StandardKeys::kUplinkInterval,
+                m_txCycleSec_Permanent
+                );
+    gCatena.SafePrintf("Default TxCycleSec in App: %u\n", framTxCycleSec);
 
     // start (or restart) the FSM.
     if (! this->m_running)
@@ -888,6 +905,7 @@ void LPTIM1_IRQHandler(void)
 void cMeasurementLoop::updateTxCycleTime()
     {
     auto txCycleCount = this->m_txCycleCount;
+    uint32_t framTxCycleSec;
 
     // update the sleep parameters
     if (txCycleCount > 1)
@@ -897,11 +915,16 @@ void cMeasurementLoop::updateTxCycleTime()
             }
     else if (txCycleCount == 1)
             {
+            pFram->getField(
+                    cFramStorage::StandardKeys::kUplinkInterval,
+                    framTxCycleSec
+                    );
+
             // it's now one (otherwise we couldn't be here.)
-            gCatena.SafePrintf("resetting tx cycle to default: %u\n", this->m_txCycleSec_Permanent);
+            gCatena.SafePrintf("resetting tx cycle to default: %u\n", framTxCycleSec);
 
             this->uplinkPort = kUplinkPortDefault;
-            this->setTxCycleTime(this->m_txCycleSec_Permanent, 0);
+            this->setTxCycleTime(framTxCycleSec, 0);
             }
     else if (this->m_fDatalimit && this->uplinkPort != kUplinkPortDataLimit)
             {
@@ -913,11 +936,16 @@ void cMeasurementLoop::updateTxCycleTime()
             }
     else if (!this->m_fDatalimit && this->uplinkPort == kUplinkPortDataLimit)
             {
+            pFram->getField(
+                    cFramStorage::StandardKeys::kUplinkInterval,
+                    framTxCycleSec
+                    );
+
             // it's back to default
-            gCatena.SafePrintf("resetting tx cycle back to default: %u\n", this->m_txCycleSec_Permanent);
+            gCatena.SafePrintf("resetting tx cycle back to default: %u\n", framTxCycleSec);
 
             this->uplinkPort = kUplinkPortDefault;
-            this->setTxCycleTime(this->m_txCycleSec_Permanent, 0);
+            this->setTxCycleTime(framTxCycleSec, 0);
             }
     else
             {
