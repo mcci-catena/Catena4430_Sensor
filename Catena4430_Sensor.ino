@@ -44,7 +44,7 @@ static_assert(
     "This sketch requires Catena-Arduino-Platform v0.21.0-5 or later"
     );
 
-constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(2,5,1,0);
+constexpr std::uint32_t kAppVersion = McciCatena4430::makeVersion(2,5,2,1);
 constexpr std::uint32_t kDoubleResetWaitMs = 3000;
 constexpr std::uint32_t kTripleResetWaitMs = 4000;
 constexpr std::uint32_t kSetDoubleResetMagic = 0xCA44301;
@@ -497,7 +497,7 @@ void setup_radio()
     {
     gLoRaWAN.begin(&gCatena);
     gCatena.registerObject(&gLoRaWAN);
-    LMIC_setClockError(10 * MAX_CLOCK_ERROR / 100);
+    LMIC_setClockError(5 * MAX_CLOCK_ERROR / 100);
     if (gfRejoin)
         LMIC_unjoinAndRejoin();
     }

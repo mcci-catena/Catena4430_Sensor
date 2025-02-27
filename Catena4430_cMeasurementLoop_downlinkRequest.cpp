@@ -1,6 +1,6 @@
 /*
 
-Module: Catena4430_cMeasurementLoop_fillBuffer.cpp
+Module: Catena4430_cMeasurementLoop_downlinkRequest.cpp
 
 Function:
     Class for transmitting accumulated measurements.
@@ -77,7 +77,7 @@ void cMeasurementLoop::receiveMessageDone(
         return;
         }
 
-    else if (! (port == 2 || port == 3))
+    else if (! (port == 1 || port == 2 || port == 3))
         {
         gCatena.SafePrintf("invalid message port(%02x)\n",
             port, nMessage
@@ -85,14 +85,23 @@ void cMeasurementLoop::receiveMessageDone(
         return;
         }
 
+    this->m_AckTxBuffer.begin();
+
+    if (port == 1)
+        {
+        this->downlinkPort = kDownlinkPortIntervalChange;
+        this->doDlrqChangeInterval(pMessage, nMessage);
+        return;
+        }
+
     if (port == 2)
         {
+        this->downlinkPort = kDownlinkPortCo2Change;
         this->doDlrqCalibCO2(pMessage, nMessage);
         return;
         }
 
-    this->m_AckTxBuffer.begin();
-
+    this->downlinkPort = kDownlinkPort;
     switch (pMessage[0])
         {
     case dlrqReset:
@@ -110,12 +119,57 @@ void cMeasurementLoop::receiveMessageDone(
     case dlrqRejoin:
         this->doDlrqRejoin(pMessage);
         break;
+    case dlrqGetUplinkInterval:
+        this->doDlrqGetUplinkInterval(pMessage);
+        break;
     default:
         gLog.printf(gLog.kError, "doCommand: unknown request %u, %u bytes\n",
                 pMessage[0],
                 nMessage
                 );
         }
+    }
+
+void cMeasurementLoop::doDlrqChangeInterval(
+    const uint8_t *pMessage,
+    size_t nMessage)
+    {
+    unsigned txCycle;
+    unsigned txCount;
+
+    if (! (1 <= nMessage && nMessage <= 3))
+        {
+        this->m_fRxAck = true;
+        this->m_AckTxBuffer.put(Error_t::kInvalidLength);
+        gCatena.SafePrintf("invalid message length(%x)\n", nMessage);
+        return;
+        }
+
+    txCycle = (pMessage[0] << 8) | pMessage[1];
+
+    if (txCycle < this->m_txMinimum || txCycle > this->m_txMaximum)
+        {
+        this->m_fRxAck = true;
+        this->m_AckTxBuffer.put(Error_t::kInvalidRange);
+        gCatena.SafePrintf("tx cycle time out of range: %u\n", txCycle);
+        return;
+        }
+
+    // byte [2], if present, is the repeat count.
+    // explicitly sending zero causes it to stick.
+    txCount = this->m_intervalCount;
+    if (nMessage >= 3)
+        {
+        txCount = pMessage[2];
+        }
+
+    this->m_fRxAck = true;
+    this->m_AckTxBuffer.put(Error_t::kSuccess);
+    setTxCycleTime(txCycle, txCount);
+    pFram->saveField(
+        cFramStorage::StandardKeys::kUplinkInterval,
+        txCycle
+        );
     }
 
 void cMeasurementLoop::doDlrqCalibCO2(
@@ -126,6 +180,8 @@ void cMeasurementLoop::doDlrqCalibCO2(
 
     if (! (nMessage == 2))
         {
+        this->m_fRxAck = true;
+        this->m_AckTxBuffer.put(Error_t::kInvalidLength);
         gCatena.SafePrintf("invalid length(%x)\n",
             nMessage
             );
@@ -134,13 +190,23 @@ void cMeasurementLoop::doDlrqCalibCO2(
 
     co2Calib = (pMessage[0] << 8) | pMessage[1];
 
+    this->m_fRxAck = true;
     if (this->m_fScd30)
         if (this->m_Scd.setForcedRecalibrationValue(co2Calib))
+            {
+            this->m_AckTxBuffer.put(Error_t::kSuccess);
             gCatena.SafePrintf("SCD30 is being calibrated to %u ppm successfully\n", co2Calib);
+            }
         else
+            {
+            this->m_AckTxBuffer.put(Error_t::kNotSuccess);
             gCatena.SafePrintf("SCD30 calibration is failed\n");
+            }
     else
+        {
+        this->m_AckTxBuffer.put(Error_t::kNotConnected);
         gCatena.SafePrintf("SCD30 is not connected\n");
+        }
     }
 
 void cMeasurementLoop::doDlrqResetAppEUI(
@@ -264,6 +330,24 @@ void cMeasurementLoop::doDlrqGetVersion(
             );
     }
 
+void cMeasurementLoop::doDlrqGetUplinkInterval(
+    const uint8_t *pMessage
+    )
+    {
+    uint32_t framTxCycleSec;
+    pFram->getField(
+            cFramStorage::StandardKeys::kUplinkInterval,
+            framTxCycleSec
+            );
+
+    this->m_AckTxBuffer.put(pMessage[0]);
+    this->m_AckTxBuffer.put(Error_t::kSuccess);
+    this->m_AckTxBuffer.put4u(framTxCycleSec);
+
+    this->m_fRxAck = true;
+    gCatena.SafePrintf("Uplink Interval configured: %u\n", framTxCycleSec);
+    }
+
 void cMeasurementLoop::sendDownlinkAck(void)
     {
     // by using a lambda, we can access the private contents
@@ -280,9 +364,8 @@ void cMeasurementLoop::sendDownlinkAck(void)
     bool fConfirmed = false;
     auto ackMessage = this->m_AckTxBuffer.getbase();
     auto nAckMessage = this->m_AckTxBuffer.getn();
-    static constexpr uint8_t kDownlinkPort = 3;
 
-    if (! gLoRaWAN.SendBuffer(ackMessage, nAckMessage, ackSentDoneCb, (void *)this, fConfirmed, kDownlinkPort))
+    if (! gLoRaWAN.SendBuffer(ackMessage, nAckMessage, ackSentDoneCb, (void *)this, fConfirmed, this->downlinkPort))
         {
         // downlink acknowledgment wasn't launched.
         gCatena.SafePrintf("Downlink Response failed\n");
