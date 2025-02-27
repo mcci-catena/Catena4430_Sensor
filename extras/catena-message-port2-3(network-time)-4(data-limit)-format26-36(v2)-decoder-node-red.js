@@ -205,7 +205,7 @@ function DecodeU24(Parse) {
     var i = Parse.i;
     var bytes = Parse.bytes;
 
-    var result = (bytes[i + 0] << 16) + (bytes[i + 1] << 8) + bytes[i + 2];
+    var result = (bytes[i] << 16) + (bytes[i + 1] << 8) + bytes[i + 2];
     Parse.i = i + 3;
 
     return result;
@@ -298,7 +298,7 @@ function DecodeV(Parse) {
     return DecodeI16(Parse) / 4096.0;
 }
 
-function DecodeDownlinkResponse(bytes) {
+function DecodeDownlinkResponse(bytes, port) {
     // Decode an uplink message from a buffer
     // (array) of bytes to an object of fields.
     var decoded = {};
@@ -309,113 +309,150 @@ function DecodeDownlinkResponse(bytes) {
     // i is used as the index into the message. Start with the flag byte.
     Parse.i = 0;
 
-    // fetch the bitmap.
-    var command = bytes[Parse.i++];
-
-    if (command === 0x02) {
-        // Reset do not send a reply back.
-    }
-
-    else if (command === 0x03) {
+    if (port === 1)
+        {
         // SW version and HW details.
-        decoded.ResponseType = "Device Version";
-
-        var responseError = bytes[Parse.i++];
-        if (responseError === 0)
-            decoded.ResponseError = "Success";
-        else if (responseError === 1)
-            decoded.ResponseError = "Invalid Length";
-        else if (responseError === 2)
-            decoded.ResponseError = "Failure";
-
-        var vMajor = bytes[Parse.i++];
-        var vMinor = bytes[Parse.i++];
-        var vPatch = bytes[Parse.i++];
-        var vLocal = bytes[Parse.i++];
-        decoded.AppVersion = "V" + vMajor + "." + vMinor + "." + vPatch + "." + vLocal;
-
-        var Model = DecodeU16(Parse);
-        var Rev = bytes[Parse.i++];
-        if (!(Model === 0))
-            {
-            decoded.Model = Model;
-            if (Rev === 0)
-                decoded.Rev = "A";
-            else if (Rev === 1)
-                decoded.Rev = "B";
-            else if (Rev === 2)
-                decoded.Rev = "C";
-            else if (Rev === 3)
-                decoded.Rev = "D";
-            else if (Rev === 4)
-                decoded.Rev = "E";
-            else if (Rev === 5)
-                decoded.Rev = "F";
-            else if (Rev === 6)
-                decoded.Rev = "G";
-            }
-        else if (Model === 0)
-            {
-            decoded.Model = 4610;
-            decoded.Rev = "Not Found";
-            }
+        decoded.ResponseType = "Set Uplink Interval";
+        // fetch the bitmap.
+        var response = bytes[Parse.i++];
+        if (response === 0)
+            decoded.response = "Success";
+        else if (response === 1)
+            decoded.response = "Invalid Length";
+        else if (response === 2)
+            decoded.response = "Failure";
+        else if (response === 3)
+            decoded.response = "Invalid Range";
         }
 
-    else if (command === 0x04) {
-        // Reset/Set AppEUI.
-        decoded.ResponseType = "AppEUI Set";
+    else if (port === 2)
+        {
+        // SW version and HW details.
+        decoded.ResponseType = "SCD30 CO2 Calibration";
+        // fetch the bitmap.
+        var response = bytes[Parse.i++];
+        if (response === 0)
+            decoded.response = "Success";
+        else if (response === 1)
+            decoded.response = "Invalid Length";
+        else if (response === 2)
+            decoded.response = "Failure";
+        else if (response === 3)
+            decoded.response = "Invalid Range";
+        else if (response === 4)
+            decoded.response = "Sensor Not Connected";
+        }
 
-        var responseError = bytes[Parse.i++];
-        if (responseError === 0)
-            decoded.ResponseError = "Success";
-        else if (responseError === 1)
-            decoded.ResponseError = "Invalid Length";
-        else if (responseError === 2)
-            decoded.ResponseError = "Failure";
+    else if (port === 3)
+        {
+        // fetch the bitmap.
+        var command = bytes[Parse.i++];
+
+        if (command === 0x02) {
+            // Reset do not send a reply back.
+        }
+
+        else if (command === 0x03) {
+            // SW version and HW details.
+            decoded.ResponseType = "Device Version";
+
+            var responseError = bytes[Parse.i++];
+            if (responseError === 0)
+                decoded.ResponseError = "Success";
+            else if (responseError === 1)
+                decoded.ResponseError = "Invalid Length";
+            else if (responseError === 2)
+                decoded.ResponseError = "Failure";
+
+            var vMajor = bytes[Parse.i++];
+            var vMinor = bytes[Parse.i++];
+            var vPatch = bytes[Parse.i++];
+            var vLocal = bytes[Parse.i++];
+            decoded.AppVersion = "V" + vMajor + "." + vMinor + "." + vPatch + "." + vLocal;
+
+            var Model = DecodeU16(Parse);
+            var Rev = bytes[Parse.i++];
+            if (!(Model === 0))
+                {
+                decoded.Model = Model;
+                if (Rev === 0)
+                    decoded.Rev = "A";
+                else if (Rev === 1)
+                    decoded.Rev = "B";
+                else if (Rev === 2)
+                    decoded.Rev = "C";
+                else if (Rev === 3)
+                    decoded.Rev = "D";
+                else if (Rev === 4)
+                    decoded.Rev = "E";
+                else if (Rev === 5)
+                    decoded.Rev = "F";
+                else if (Rev === 6)
+                    decoded.Rev = "G";
+                }
+            else if (Model === 0)
+                {
+                decoded.Model = 4610;
+                decoded.Rev = "Not Found";
+                }
+            }
+
+        else if (command === 0x04) {
+            // Reset/Set AppEUI.
+            decoded.ResponseType = "AppEUI Set";
+
+            var responseError = bytes[Parse.i++];
+            if (responseError === 0)
+                decoded.ResponseError = "Success";
+            else if (responseError === 1)
+                decoded.ResponseError = "Invalid Length";
+            else if (responseError === 2)
+                decoded.ResponseError = "Failure";
+        }
+
+        else if (command === 0x05) {
+            // Reset/Set AppKey.
+            decoded.ResponseType = "AppKey set";
+
+            var responseError = bytes[Parse.i++];
+            if (responseError === 0)
+                decoded.ResponseError = "Success";
+            else if (responseError === 1)
+                decoded.ResponseError = "Invalid Length";
+            else if (responseError === 2)
+                decoded.ResponseError = "Failure";
+        }
+
+        else if (command === 0x06) {
+            // Rejoin the network.
+            decoded.ResponseType = "Rejoin";
+
+            var responseError = bytes[Parse.i++];
+            if (responseError === 0)
+                decoded.ResponseError = "Success";
+            else if (responseError === 1)
+                decoded.ResponseError = "Invalid Length";
+            else if (responseError === 2)
+                decoded.ResponseError = "Failure";
+        }
+
+        else if (command === 0x07) {
+            // Uplink Interval for sensor data.
+            decoded.ResponseType = "Uplink Interval";
+
+            var responseError = bytes[Parse.i++];
+            if (responseError === 0)
+                decoded.ResponseError = "Success";
+            else if (responseError === 1)
+                decoded.ResponseError = "Invalid Length";
+            else if (responseError === 2)
+                decoded.ResponseError = "Failure";
+
+            decoded.UplinkInterval = DecodeU32(Parse);
+        }
+        else
+            return null;
     }
-
-    else if (command === 0x05) {
-        // Reset/Set AppKey.
-        decoded.ResponseType = "AppKey set";
-
-        var responseError = bytes[Parse.i++];
-        if (responseError === 0)
-            decoded.ResponseError = "Success";
-        else if (responseError === 1)
-            decoded.ResponseError = "Invalid Length";
-        else if (responseError === 2)
-            decoded.ResponseError = "Failure";
-    }
-
-    else if (command === 0x06) {
-        // Rejoin the network.
-        decoded.ResponseType = "Rejoin";
-
-        var responseError = bytes[Parse.i++];
-        if (responseError === 0)
-            decoded.ResponseError = "Success";
-        else if (responseError === 1)
-            decoded.ResponseError = "Invalid Length";
-        else if (responseError === 2)
-            decoded.ResponseError = "Failure";
-    }
-
-    else if (command === 0x07) {
-        // Uplink Interval for sensor data.
-        decoded.ResponseType = "Uplink Interval";
-
-        var responseError = bytes[Parse.i++];
-        if (responseError === 0)
-            decoded.ResponseError = "Success";
-        else if (responseError === 1)
-            decoded.ResponseError = "Invalid Length";
-        else if (responseError === 2)
-            decoded.ResponseError = "Failure";
-
-        decoded.UplinkInterval = DecodeU32(Parse);
-    }
-    else
-        return null;
 
     return decoded;
 }
@@ -425,18 +462,17 @@ function Decoder(bytes, port) {
     // (array) of bytes to an object of fields.
     var decoded = {};
 
-    if (! (port === 2) && ! (port === 3) && ! (port === 4))
+    if (! (port === 1) && ! (port === 2) && ! (port === 3) && ! (port === 4))
         return null;
 
     var uFormat = bytes[0];
-    if (! (uFormat === 0x26) && ! (uFormat === 0x36) && (port === 3))
+    if (! (uFormat === 0x26) && ! (uFormat === 0x36) && ((port === 1) || (port === 2) || (port === 3)))
         {
-        decoded = DecodeDownlinkResponse(bytes);
+        decoded = DecodeDownlinkResponse(bytes, port);
         return decoded;
         }
-    else if (! (uFormat === 0x26) && ! (uFormat === 0x36) && ! (port === 3))
+    else if (! (uFormat === 0x26) && ! (uFormat === 0x36) && ! ((port === 1) || (port === 2) || (port === 3)))
         return null;
-
 
     // an object to help us parse.
     var Parse = {};
